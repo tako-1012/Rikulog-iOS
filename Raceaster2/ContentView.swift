@@ -1,8 +1,8 @@
 //
 //  ContentView.swift
-//  Raceaster
+//  Raceaster2
 //
-//  Created by 杉原虎太朗 on 2025/12/01.
+//  Created by 杉原虎太朗 on 2025/12/15.
 //
 
 import SwiftUI
