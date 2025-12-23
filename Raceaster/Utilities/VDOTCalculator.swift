@@ -18,24 +18,47 @@ struct VDOTCalculator {
     ///   - distanceKm: 距離（km）
     ///   - timeSeconds: タイム（秒）
     /// - Returns: VDOT値
-    static func calculateVDOT(distanceKm: Double, timeSeconds: Int) -> Double {
+    static func calculateVDOT(distanceKm: Double, timeSeconds: Double) -> Double {
+        // 入力値の検証（ゼロ除算・異常値防止）
+        guard distanceKm > 0 && distanceKm < 1000 else { return 0 }
+        guard timeSeconds > 0 && timeSeconds < 86400 * 7 else { return 0 } // 最大7日
+        
         // 距離をメートルに変換
         let distanceMeters = distanceKm * 1000.0
-        let timeMinutes = Double(timeSeconds) / 60.0
+        let timeMinutes = timeSeconds / 60.0
         
         // 酸素摂取量の計算（簡易版）
         // VO2 = -4.60 + 0.182258 * velocity + 0.000104 * velocity^2
         let velocity = distanceMeters / timeMinutes // m/min
+        
+        // velocityの範囲チェック（オーバーフロー防止）
+        guard velocity > 0 && velocity < 1000000 else { return 0 }
+        
         let vo2 = -4.60 + 0.182258 * velocity + 0.000104 * velocity * velocity
+        
+        // VO2の妥当性チェック
+        guard vo2.isFinite && vo2 > 0 else { return 0 }
         
         // パフォーマンスファクターの計算
         // %VO2max = 0.8 + 0.1894393 * e^(-0.012778 * time) + 0.2989558 * e^(-0.1932605 * time)
-        let percentVO2Max = 0.8 + 0.1894393 * exp(-0.012778 * timeMinutes) + 0.2989558 * exp(-0.1932605 * timeMinutes)
+        let exp1 = exp(-0.012778 * timeMinutes)
+        let exp2 = exp(-0.1932605 * timeMinutes)
+        
+        // 指数計算の妥当性チェック
+        guard exp1.isFinite && exp2.isFinite else { return 0 }
+        
+        let percentVO2Max = 0.8 + 0.1894393 * exp1 + 0.2989558 * exp2
+        
+        // ゼロ除算防止
+        guard percentVO2Max > 0 else { return 0 }
         
         // VDOT = VO2 / %VO2max
         let vdot = vo2 / percentVO2Max
         
-        return max(vdot, 0)
+        // 最終結果の妥当性チェック
+        guard vdot.isFinite && vdot > 0 else { return 0 }
+        
+        return min(max(vdot, 0), 100) // 0-100の範囲に制限
     }
     
     /// VDOTからトレーニングペース（秒/km）を計算
@@ -77,6 +100,9 @@ struct VDOTCalculator {
     
     /// VO2比率からペースを計算（内部使用）
     private static func calculatePaceForVO2(vdot: Double, vo2Percent: Double) -> Double {
+        // VDOT値の検証
+        guard vdot > 0 && vdot < 200 else { return 300.0 } // デフォルト値（5分/km）
+        
         let vo2 = vdot * vo2Percent
         
         // VO2からベロシティを逆算
@@ -86,13 +112,22 @@ struct VDOTCalculator {
         let c = -(vo2 + 4.60)
         
         let discriminant = b * b - 4 * a * c
-        guard discriminant >= 0 else { return 300.0 } // デフォルト値（5分/km）
+        guard discriminant >= 0 && discriminant.isFinite else { return 300.0 }
         
-        let velocity = (-b + sqrt(discriminant)) / (2 * a)
+        let sqrtDiscriminant = sqrt(discriminant)
+        guard sqrtDiscriminant.isFinite else { return 300.0 }
+        
+        let velocity = (-b + sqrtDiscriminant) / (2 * a)
+        
+        // ゼロ除算防止とvelocity範囲チェック
+        guard velocity > 0 && velocity < 1000000 && velocity.isFinite else { return 300.0 }
         
         // ベロシティ（m/min）からペース（秒/km）に変換
         let paceMinPerKm = 1000.0 / velocity
         let paceSecPerKm = paceMinPerKm * 60.0
+        
+        // 結果の妥当性チェック（30秒/km～30分/km）
+        guard paceSecPerKm.isFinite && paceSecPerKm > 30 && paceSecPerKm < 1800 else { return 300.0 }
         
         return paceSecPerKm
     }
