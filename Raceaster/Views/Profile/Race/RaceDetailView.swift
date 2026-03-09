@@ -6,7 +6,12 @@ struct RaceDetailView: View {
     let race: RaceRecord
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \RaceDistance.sortOrder) private var distances: [RaceDistance]
+    @Query(sort: \RaceRecord.date, order: .reverse) private var allRaces: [RaceRecord]
+    @Query private var userProfiles: [UserProfile]
     @State private var navigationPath: NavigationPath = NavigationPath()
+    @State private var showingShareSheet = false
+    
+    private var userProfile: UserProfile { userProfiles.first ?? UserProfile() }
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -90,7 +95,7 @@ struct RaceDetailView: View {
                                         modelContext.insert(lap)
                                     }
                                     race.totalTime = newLapDataArray.reduce(0) { $0 + $1.time }
-                                    do { try modelContext.save() } catch { }
+                                    do { try modelContext.save() } catch { print("⚠️ Lap update save failed: \(error)") }
                                 },
                                 raceType: race.raceType,
                                 totalDistance: race.totalDistance,
@@ -115,6 +120,31 @@ struct RaceDetailView: View {
                         Text(race.memo)
                     }
                 }
+                
+                // 共有カード導線
+                Section {
+                    Button(action: { showingShareSheet = true }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "photo.on.rectangle.angled")
+                                .font(.title3)
+                                .foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("この記録をシェア")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.primary)
+                                Text("共有カードを作成してSNSに投稿")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .navigationTitle(race.raceName)
             .navigationBarTitleDisplayMode(.inline)
@@ -130,7 +160,7 @@ struct RaceDetailView: View {
                             try modelContext.save()
                             navigationPath.removeLast()
                         } catch {
-                            // エラーハンドリング
+                            print("⚠️ Lap edit save failed: \(error)")
                         }
                     },
                     raceType: race.raceType
@@ -158,7 +188,7 @@ struct RaceDetailView: View {
                                 try modelContext.save()
                                 navigationPath.removeLast()
                             } catch {
-                                // エラーハンドリング
+                                print("⚠️ Lap add save failed: \(error)")
                             }
                         },
                         raceType: race.raceType,
@@ -174,13 +204,23 @@ struct RaceDetailView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: AddRaceView(raceToEdit: race)) {
-                        Text("編集")
+                    HStack(spacing: 16) {
+                        Button(action: { showingShareSheet = true }) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        NavigationLink(destination: AddRaceView(raceToEdit: race)) {
+                            Text("編集")
+                        }
                     }
                 }
             }
+            .sheet(isPresented: $showingShareSheet) {
+                ShareRaceView(race: race, userProfile: userProfile)
+            }
         }
     }
+    
+
 
     private func distanceDisplayName() -> String {
         // matches\u30e1\u30bd\u30c3\u30c9\u3092\u4f7f\u7528\u3057\u3066\u7a2e\u76ee\u540d\u3092\u691c\u7d22

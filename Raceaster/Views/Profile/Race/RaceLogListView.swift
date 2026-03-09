@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import GoogleMobileAds  // 広告表示用
 
 /// レース記録一覧ビュー
 struct RaceLogListView: View {
@@ -12,6 +11,9 @@ struct RaceLogListView: View {
     @State private var showLimitAlert = false
     @State private var showPaywall = false
     @State private var selectedDistance: RaceDistance?
+    @State private var showDeleteAlert = false
+    @State private var raceToDelete: RaceRecord?
+    @State private var searchText: String = ""
     private let freeRaceLimit = 50
 
     var body: some View {
@@ -24,10 +26,21 @@ struct RaceLogListView: View {
                 
                 if displayedRaces.isEmpty {
                     ContentUnavailableView {
-                        Label("レース記録なし", systemImage: "figure.run")
+                        Label("レース記録なし", systemImage: "figure.run.circle")
                     } description: {
-                        Text("初めての記録を追加してみましょう！\n右上の＋ボタンをタップしてください。")
+                        Text("初めてのレース記録を追加して\nあなたの走りを記録しましょう！")
                             .multilineTextAlignment(.center)
+                    } actions: {
+                        Button(action: {
+                            if !entitlements.canUsePremiumFeatures && races.count >= freeRaceLimit {
+                                showLimitAlert = true
+                            } else {
+                                showAddRace = true
+                            }
+                        }) {
+                            Label("記録を追加", systemImage: "plus.circle.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 } else {
                     List {
@@ -37,32 +50,17 @@ struct RaceLogListView: View {
                             }
                         }
                         .onDelete { indexSet in
-                            // 削除処理: modelContext を使って削除
-                            for idx in indexSet {
-                                let race = displayedRaces[idx]
-                                modelContext.delete(race)
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    // 保存に失敗した場合はログ出力
-                                    print("Failed to delete race: \(error)")
-                                }
+                            // 削除確認ダイアログを表示
+                            if let idx = indexSet.first {
+                                raceToDelete = displayedRaces[idx]
+                                showDeleteAlert = true
                             }
                         }
                     }
                     .listStyle(.insetGrouped)
                 }
-                // 底部にバナー広告を表示（有効な場合）
-                if entitlements.shouldShowAds {
-                    BannerAdView(
-                        adUnitID: BannerAdView.ProductionAdUnitIDs.raceList,
-                        adSize: AdSizeBanner
-                    )
-                    .frame(height: 50)
-                    .background(Color(UIColor.systemBackground))
-                }
-
             }
+            .searchable(text: $searchText, prompt: "大会名で検索")
             .navigationTitle("レース記録")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -113,6 +111,22 @@ struct RaceLogListView: View {
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
             }
+            .alert("記録を削除", isPresented: $showDeleteAlert, presenting: raceToDelete) { race in
+                Button("キャンセル", role: .cancel) {
+                    raceToDelete = nil
+                }
+                Button("削除", role: .destructive) {
+                    modelContext.delete(race)
+                    do {
+                        try modelContext.save()
+                    } catch {
+                        print("⚠️ Failed to delete race: \(error)")
+                    }
+                    raceToDelete = nil
+                }
+            } message: { race in
+                Text("\"\(race.raceName)\" の記録を削除しますか？\nこの操作は取り消せません。")
+            }
         }
     }
 
@@ -148,12 +162,16 @@ struct RaceLogListView: View {
     }
 
     private var displayedRaces: [RaceRecord] {
+        var result = races
         if let dist = selectedDistance {
-            return races.filter { r in
+            result = result.filter { r in
                 dist.matches(distance: r.totalDistance) && r.raceType == dist.raceType
             }
         }
-        return races
+        if !searchText.isEmpty {
+            result = result.filter { $0.raceName.localizedCaseInsensitiveContains(searchText) }
+        }
+        return result
     }
 }
 

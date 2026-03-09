@@ -17,6 +17,8 @@ struct TimeInputFields: View {
     var onNormalize: (() -> Void)?
     // Whether to enable AccessoryTextField's inputAccessoryView Done button.
     var accessoryEnabled: Bool = true
+    // Whether to show the hours field (false for pace input)
+    var showHours: Bool = true
 
     var body: some View {
         ZStack {
@@ -30,32 +32,37 @@ struct TimeInputFields: View {
                     onNormalize?()
                 }
 
-            HStack(spacing: 12) {
-                VStack {
-                    // 修正: isFirstResponder を nil に設定（これで入力中に閉じなくなります）
-                    AccessoryTextField(text: $hoursText, placeholder: "0", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: accessoryEnabled)
-                        .multilineTextAlignment(.center)
-                        .frame(width: 60)
-                    Text("時間").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                if showHours {
+                    VStack(spacing: 4) {
+                        AccessoryTextField(text: $hoursText, placeholder: "0", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: accessoryEnabled)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 70, height: 44)
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(8)
+                        Text("時間").font(.caption).foregroundStyle(.secondary)
+                    }
+                    
+                    Text(":").font(.title2).padding(.bottom, 20)
                 }
                 
-                Text(":").font(.title2)
-                
-                VStack {
-                    // 修正: isFirstResponder を nil に設定
+                VStack(spacing: 4) {
                     AccessoryTextField(text: $minutesText, placeholder: "0", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: accessoryEnabled)
                         .multilineTextAlignment(.center)
-                        .frame(width: 60)
+                        .frame(width: 70, height: 44)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(8)
                     Text("分").font(.caption).foregroundStyle(.secondary)
                 }
                 
-                Text(":").font(.title2)
+                Text(":").font(.title2).padding(.bottom, 20)
                 
-                VStack {
-                    // 修正: isFirstResponder を nil に設定
+                VStack(spacing: 4) {
                     AccessoryTextField(text: $secondsText, placeholder: "0.0", keyboardType: .decimalPad, isFirstResponder: nil, showAccessory: accessoryEnabled)
                         .multilineTextAlignment(.center)
-                        .frame(width: 60)
+                        .frame(width: 80, height: 44)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(8)
                     Text("秒").font(.caption).foregroundStyle(.secondary)
                 }
             }

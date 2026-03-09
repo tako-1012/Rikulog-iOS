@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import GoogleMobileAds
 
 /// 設定画面ビュー
 struct SettingsView: View {
@@ -16,6 +15,13 @@ struct SettingsView: View {
     @State private var seasonStartMonthState: Int = 4
     @State private var seasonEndMonthState: Int = 3
     @State private var showPaywall = false
+    @AppStorage("notificationFrequency") private var notificationFrequency: String = NotificationFrequency.weekly.rawValue
+    
+    // 通知頻度を取得
+    private var selectedFrequency: NotificationFrequency {
+        get { NotificationFrequency(rawValue: notificationFrequency) ?? .weekly }
+        set { notificationFrequency = newValue.rawValue }
+    }
     
     var body: some View {
         NavigationStack {
@@ -36,12 +42,12 @@ struct SettingsView: View {
                         HStack {
                             Label("バージョン", systemImage: "info.circle")
                             Spacer()
-                            Text("1.0.0").foregroundStyle(.secondary)
+                            Text(appVersion).foregroundStyle(.secondary)
                         }
                         HStack {
                             Label("ビルド", systemImage: "hammer")
                             Spacer()
-                            Text("2025.12.08").foregroundStyle(.secondary)
+                            Text(buildNumber).foregroundStyle(.secondary)
                         }
                     }
 
@@ -85,37 +91,52 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        Picker("通知頻度", selection: Binding(
+                            get: { selectedFrequency },
+                            set: { newValue in
+                                notificationFrequency = newValue.rawValue
+                                NotificationManager.shared.currentFrequency = newValue
+                            }
+                        )) {
+                            ForEach(NotificationFrequency.allCases) { frequency in
+                                Text(frequency.displayName).tag(frequency)
+                            }
+                        }
+                    } header: {
+                        Text("通知設定")
+                    } footer: {
+                        Text("レース記録の登録を促す通知の頻度を設定します。")
+                    }
+
+                    Section {
                         Picker("シーズン開始月", selection: $seasonStartMonthState) {
                             ForEach(Array(1...12), id: \.self) { Text("\($0)月").tag($0) }
                         }
-                        Picker("シーズン終了月", selection: $seasonEndMonthState) {
-                            ForEach(Array(1...12), id: \.self) { Text("\($0)月").tag($0) }
+                        LabeledContent("シーズン終了月") {
+                            let endMonth = seasonStartMonthState == 1 ? 12 : seasonStartMonthState - 1
+                            Text("\(endMonth)月")
+                                .foregroundStyle(.secondary)
                         }
                     } header: {
                         Text("シーズン設定")
                     } footer: {
-                        Text("シーズンの開始・終了月を設定します（例: 4月開始 → 4月 - 翌年3月）。")
+                        Text("シーズンは開始月から1年間です（例: 4月開始 → 4月〜翌年3月）")
                     }
 
                     // (Manual dedupe button removed; automatic dedupe runs at startup.)
                 }
 
-                if entitlements.shouldShowAds {
-                    BannerAdView(adUnitID: BannerAdView.ProductionAdUnitIDs.settings, adSize: AdSizeBanner)
-                        .frame(height: 50)
-                        .background(Color.gray.opacity(0.1))
-                }
             }
             .navigationTitle("設定")
             .sheet(isPresented: $showingPrivacyPolicy) {
-                if let url = URL(string: "https://tako-1012.github.io/riku-log-policies/privacy-policy.html") {
+                if let url = URL(string: "https://tako-1012.github.io/riku-log_policies/privacy-policy.html") {
                     SafariView(url: url)
                 } else {
                     PrivacyPolicyView()
                 }
             }
             .sheet(isPresented: $showingTerms) {
-                if let url = URL(string: "https://tako-1012.github.io/riku-log-policies/terms.html") {
+                if let url = URL(string: "https://tako-1012.github.io/riku-log_policies/terms.html") {
                     SafariView(url: url)
                 } else {
                     TermsOfServiceView()
@@ -124,14 +145,6 @@ struct SettingsView: View {
             .sheet(isPresented: $showPaywall) { PaywallView() }
         }
         .onAppear {
-            if userProfiles.isEmpty {
-                let newProfile = UserProfile()
-                modelContext.insert(newProfile)
-                do { try modelContext.save() } catch {
-                    initErrorMessage = "ユーザープロファイル作成に失敗しました: \(error.localizedDescription)"
-                    showingInitError = true
-                }
-            }
             if let profile = userProfiles.first {
                 seasonStartMonthState = profile.seasonStartMonth
                 seasonEndMonthState = profile.seasonEndMonth
@@ -141,7 +154,7 @@ struct SettingsView: View {
             var inserted = 0
             for distance in defaults {
                 let exists = distances.contains { existing in
-                    abs(existing.distanceKm - distance.distanceKm) < 0.0001 && existing.raceType == distance.raceType
+                    abs(existing.distanceKm - distance.distanceKm) < 0.0001 && existing.raceType == distance.raceType && existing.name == distance.name
                 }
                 if !exists { modelContext.insert(distance); inserted += 1 }
             }
@@ -156,19 +169,15 @@ struct SettingsView: View {
         .onChange(of: seasonStartMonthState) { _, new in
             guard let profile = userProfiles.first else { return }
             profile.seasonStartMonth = new
+            // 終了月を自動計算（開始月の前月）
+            let endMonth = new == 1 ? 12 : new - 1
+            profile.seasonEndMonth = endMonth
             do { try modelContext.save() } catch {
-                initErrorMessage = "シーズン開始月の保存に失敗しました: \(error.localizedDescription)"
+                initErrorMessage = "シーズン設定の保存に失敗しました: \(error.localizedDescription)"
                 showingInitError = true
             }
         }
-        .onChange(of: seasonEndMonthState) { _, new in
-            guard let profile = userProfiles.first else { return }
-            profile.seasonEndMonth = new
-            do { try modelContext.save() } catch {
-                initErrorMessage = "シーズン終了月の保存に失敗しました: \(error.localizedDescription)"
-                showingInitError = true
-            }
-        }
+
     }
 
     
@@ -203,6 +212,17 @@ extension SettingsView {
             }
         }
     }
+    
+    // MARK: - Bundle情報の取得
+    /// Bundle.mainからアプリバージョンを取得
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+    }
+    
+    /// Bundle.mainからビルド番号を取得
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+    }
 }
 
 // MARK: - 種目管理画面
@@ -222,7 +242,7 @@ struct RaceDistanceManagementView: View {
             // Display order: Track first, then Road, then Other
             ForEach([RaceType.track, RaceType.road, RaceType.other], id: \.self) { raceType in
                 Section(raceType.displayName) {
-                    let filteredDistances = allDistances.filter { $0.raceType == raceType }
+                    let filteredDistances = allDistances.filter { $0.raceType == raceType && !isDeletedDistance($0) }
                     if filteredDistances.isEmpty {
                         Text("種目が登録されていません").foregroundStyle(.secondary).italic()
                     } else {
@@ -265,31 +285,70 @@ struct RaceDistanceManagementView: View {
     }
 
     private func deleteDistance(_ distance: RaceDistance) {
+        // まず削除したデフォルト種目を記録して、再起動時に復活しないようにする
+        recordDeletedDefaultDistance(distance)
+        
+        // データベースから削除
         modelContext.delete(distance)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            print("Successfully deleted distance: \(distance.name)")
+        } catch {
+            print("Failed to delete distance: \(error.localizedDescription)")
+        }
+    }
+    
+    private func recordDeletedDefaultDistance(_ distance: RaceDistance) {
+        let key = "deletedDefaultDistances"
+        var deletedIds = UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []
+        
+        // 削除した種目の情報を記録（距離とレースタイプで一意に識別）
+        let entry: [String: Any] = [
+            "distanceKm": distance.distanceKm,
+            "raceType": distance.raceType.rawValue,
+            "name": distance.name
+        ]
+        
+        // 重複を避ける
+        if !deletedIds.contains(where: { dict in
+            let dkm = dict["distanceKm"] as? Double ?? 0
+            let rtype = dict["raceType"] as? String ?? ""
+            let dname = dict["name"] as? String ?? ""
+            return abs(dkm - distance.distanceKm) < 0.0001 && rtype == distance.raceType.rawValue && dname == distance.name
+        }) {
+            deletedIds.append(entry)
+            UserDefaults.standard.set(deletedIds, forKey: key)
+        }
+    }
+    
+    private static func isDefaultDistanceDeleted(_ distance: RaceDistance) -> Bool {
+        let key = "deletedDefaultDistances"
+        let deletedIds = UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []
+        
+        return deletedIds.contains { dict in
+            let dkm = dict["distanceKm"] as? Double ?? 0
+            let rtype = dict["raceType"] as? String ?? ""
+            let dname = dict["name"] as? String ?? ""
+            return abs(dkm - distance.distanceKm) < 0.0001 && rtype == distance.raceType.rawValue && dname == distance.name
+        }
     }
 
     @MainActor
     private func performManagementViewAutoDedupe() async {
-        let all = allDistances
-        var groups: [String: [RaceDistance]] = [:]
-        for d in all {
-            let key = "\(d.raceType.rawValue)-\(String(format: "%.6f", d.distanceKm))"
-            groups[key, default: []].append(d)
-        }
-
-        var deleted = 0
-        for (_, items) in groups {
-            if items.count <= 1 { continue }
-            let duplicates = items.dropFirst()
-            for dup in duplicates {
-                modelContext.delete(dup)
-                deleted += 1
-            }
-        }
-
-        do { try modelContext.save() } catch { print("ManagementView auto-dedupe save failed: \(error)") }
+        let deleted = RaceDistanceDeduplicator.deduplicateDistances(allDistances, in: modelContext)
         if deleted > 0 { print("ManagementView auto dedupe completed. Deleted \(deleted) duplicate RaceDistance entries.") }
+    }
+    
+    private func isDeletedDistance(_ distance: RaceDistance) -> Bool {
+        let key = "deletedDefaultDistances"
+        let deletedIds = UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []
+        
+        return deletedIds.contains { dict in
+            let dkm = dict["distanceKm"] as? Double ?? 0
+            let rtype = dict["raceType"] as? String ?? ""
+            let dname = dict["name"] as? String ?? ""
+            return abs(dkm - distance.distanceKm) < 0.0001 && rtype == distance.raceType.rawValue && dname == distance.name
+        }
     }
 }
 

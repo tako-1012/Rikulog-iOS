@@ -17,11 +17,25 @@ struct ShareProfileView: View {
 
     var userName: String
     var affiliation: String
+    var seasonStartMonth: Int
     var allRecords: [ShareRecordItem]
 
     @State private var selectedTitleMode: TitleMode = .pb
     @State private var customTitle: String = ""
-    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
+    @State private var selectedYear: Int = 0 // Will be initialized in onAppear or init logic
+    
+    init(userName: String, affiliation: String, seasonStartMonth: Int, allRecords: [ShareRecordItem]) {
+        self.userName = userName
+        self.affiliation = affiliation
+        self.seasonStartMonth = seasonStartMonth
+        self.allRecords = allRecords
+        
+        let currentYear = Calendar.current.component(.year, from: Date())
+        let currentMonth = Calendar.current.component(.month, from: Date())
+        // Calculate initial fiscal year based on seasonStartMonth
+        let initialYear = (currentMonth < seasonStartMonth) ? currentYear - 1 : currentYear
+        _selectedYear = State(initialValue: initialYear)
+    }
     @State private var selectedRecordIds: Set<UUID> = []
     @State private var showingShareSheet: Bool = false
     @State private var showDateOnCard: Bool = true
@@ -47,7 +61,7 @@ struct ShareProfileView: View {
         let source: [ShareRecordItem]
         switch selectedTitleMode {
         case .pb: source = allRecords
-        case .sb: source = allRecords.filter { Calendar.current.component(.year, from: $0.date) == selectedYear }
+        case .sb: source = allRecords.filter { fiscalYear(for: $0.date) == selectedYear }
         case .custom: return allRecords
         }
         let grouped = Dictionary(grouping: source, by: { "\($0.totalDistance)-\($0.raceType)" })
@@ -87,6 +101,10 @@ struct ShareProfileView: View {
         getBaseRecords().filter { $0.raceType == .road }.sorted { $0.totalDistance < $1.totalDistance }
     }
 
+    private var otherRecords: [ShareRecordItem] {
+        getBaseRecords().filter { $0.raceType == .other }.sorted { $0.totalDistance < $1.totalDistance }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -119,7 +137,7 @@ struct ShareProfileView: View {
                         }
 
                         if selectedTitleMode == .sb {
-                            let years = Array(Set(allRecords.map { Calendar.current.component(.year, from: $0.date) })).sorted(by: >)
+                            let years = Array(Set(allRecords.map { fiscalYear(for: $0.date) })).sorted(by: >)
                             Picker("対象年度", selection: $selectedYear) {
                                 ForEach(years, id: \.self) { Text("\(String($0))年度").tag($0) }
                             }
@@ -154,17 +172,51 @@ struct ShareProfileView: View {
                     if !roadRecords.isEmpty {
                         Section("ロード種目 (BEST)") { ForEach(roadRecords) { recordRow($0) } }
                     }
+                    if !otherRecords.isEmpty {
+                        Section("その他種目 (BEST)") { ForEach(otherRecords) { recordRow($0) } }
+                    }
                 }
+                
+                // Bottom Button Area
+                VStack(spacing: 12) {
+                    Button(action: { showingShareSheet = true }) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("共有する")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+                    .disabled(selectedRecordIds.isEmpty)
+                    .opacity(selectedRecordIds.isEmpty ? 0.5 : 1.0)
+                    
+                    Button(action: saveToPhotos) {
+                        HStack {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("画像を保存")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                    .disabled(selectedRecordIds.isEmpty)
+                    .opacity(selectedRecordIds.isEmpty ? 0.5 : 1.0)
+                }
+                .padding()
+                .background(Color(uiColor: .systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: -4)
             }
             .navigationTitle("共有画像の作成").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("閉じる") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    HStack(spacing: 16) {
-                        Button(action: saveToPhotos) { Image(systemName: "square.and.arrow.down") }.disabled(selectedRecordIds.isEmpty)
-                        Button(action: { showingShareSheet = true }) { Image(systemName: "square.and.arrow.up") }.disabled(selectedRecordIds.isEmpty)
-                    }
-                }
+                // ツールバーのアイコンボタンは削除（下部に移動したため）
                 // ✅ キーボードを閉じるボタン（ツールバー上にも配置）
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -236,5 +288,11 @@ struct ShareProfileView: View {
         }
 
         UIImageWriteToSavedPhotosAlbum(image, PhotoSaveHelper.shared, #selector(PhotoSaveHelper.image(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    private func fiscalYear(for date: Date) -> Int {
+        let year = Calendar.current.component(.year, from: date)
+        let month = Calendar.current.component(.month, from: date)
+        return (month < seasonStartMonth) ? year - 1 : year
     }
 }

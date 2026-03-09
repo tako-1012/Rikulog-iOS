@@ -3,6 +3,7 @@ import SwiftData
 import GoogleMobileAds
 import AppTrackingTransparency
 import CloudKit
+import UserNotifications
 
 @main
 struct RaceMasterApp: App {
@@ -26,6 +27,9 @@ struct RaceMasterApp: App {
             RaceMasterApp.requestTrackingAuthorization()
         }
 
+        // 月末リマインダーのローカル通知を準備
+        NotificationManager.shared.ensureMonthEndReminderScheduled()
+
         // 起動時のエントitlements と 購入状態をログ出力（実機デバッグ用）
         DispatchQueue.main.async {
             #if DEBUG
@@ -34,6 +38,11 @@ struct RaceMasterApp: App {
             print("🔎 StoreKitManager.isPremium: \(StoreKitManager.shared.isPremium)")
             #endif
         }
+
+        // 起動直後に RaceDistance の重複を除去（TabView 描画前に実施）
+        // CloudKit 同期前のローカル状態に対して即時クリーンアップを行い、
+        // 起動直後のPB重複表示を抑制します（後続のView側の二重防御も維持）。
+        earlyAutoDedupeRaceDistances()
     }
 
     // ATT リクエスト関数
@@ -84,8 +93,8 @@ struct RaceMasterApp: App {
                 status = s
                 sem.signal()
             }
-            // wait up to 2 seconds for account status
-            _ = sem.wait(timeout: .now() + 2)
+            // wait up to 0.5 seconds for account status (short timeout to avoid Watchdog kill)
+            _ = sem.wait(timeout: .now() + 0.5)
             if status == .available {
                 enableCloudKit = true
             }
@@ -122,18 +131,70 @@ struct RaceMasterApp: App {
 
             return container
         } catch {
-            print("❌ ModelContainer initialization failed: \(error.localizedDescription)")
+            print("❌ CloudKit ModelContainer failed: \(error.localizedDescription). Falling back to local-only.")
             print("Error details: \(error)")
-            fatalError("Could not create ModelContainer: \(error)")
+            // CloudKit失敗時はローカルのみで起動（ユーザーデータは保持される）
+            do {
+                let fallbackConfig = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false
+                )
+                let fallbackContainer = try ModelContainer(
+                    for: schema,
+                    configurations: [fallbackConfig]
+                )
+                print("✅ Fallback local-only ModelContainer created successfully")
+                return fallbackContainer
+            } catch {
+                print("❌ Even local-only ModelContainer failed: \(error)")
+                fatalError("Could not create even local ModelContainer: \(error)")
+            }
         }
     }()
     
     var body: some Scene {
         WindowGroup {
-            MainTabView()
-            .environmentObject(entitlements)
-            .environmentObject(storeKitManager)
+            if storeKitManager.isLoading {
+                // 起動時にStoreKitの状態が確定するまで短時間待機
+                // キャッシュがあれば通常は非常に短時間（数ms）で解除される
+                ZStack {
+                    Color(UIColor.systemBackground)
+                        .ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        Spacer()
+                        Image(systemName: "stopwatch.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(.blue)
+                        Text("陸ログ")
+                            .font(.title)
+                            .fontWeight(.bold)
+                        Spacer()
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("起動中...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                            .frame(height: 60)
+                    }
+                }
+            } else {
+                MainTabView()
+                    .environmentObject(entitlements)
+                    .environmentObject(storeKitManager)
+            }
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+// MARK: - Early Dedupe
+extension RaceMasterApp {
+    /// App起動直後に `RaceDistance` の重複エントリを除去する。
+    private func earlyAutoDedupeRaceDistances() {
+        let deleted = RaceDistanceDeduplicator.deduplicateDistances(in: sharedModelContainer)
+        if deleted > 0 {
+            print("Early auto dedupe completed. Deleted \(deleted) duplicate RaceDistance entries before UI.")
+        }
     }
 }

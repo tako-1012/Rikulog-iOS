@@ -15,7 +15,7 @@
   ],
   "products" : [
     {
-      "displayPrice" : "1500",
+      "displayPrice" : "500",
       "familyShareable" : false,
       "internalID" : "EA670D9C",
       "localizations" : [
@@ -45,47 +45,7 @@
     "_timeRate" : 0
   },
   "subscriptionGroups" : [
-    {
-      "id" : "A979E5EC",
-      "localizations" : [
-        {
-          "description" : "Unlimited access",
-          "displayName" : "Premium Lifetime",
-          "locale" : "en_US"
-        }
-      ],
-      "name" : "PremiumGroup",
-      "subscriptions" : [
-        {
-          "adHocOffers" : [
 
-          ],
-          "codeOffers" : [
-
-          ],
-          "displayPrice" : "200",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "86DBF8C9",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "",
-              "displayName" : "",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "rikulog_premium_monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Premium Monthly",
-          "subscriptionGroupID" : "A979E5EC",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [
-
-          ]
-        }
-      ]
-    }
   ],
   "version" : {
     "major" : 4,

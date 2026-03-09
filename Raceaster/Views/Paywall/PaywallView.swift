@@ -10,36 +10,51 @@ struct PaywallView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // ヘッダー
-                    headerSection
-                    
-                    // 機能比較
-                    featureComparisonSection
-                    
-                    // プラン選択
-                    if store.isLoading {
-                        ProgressView()
-                            .padding()
-                    } else {
-                        planSelectionSection
+            ZStack {
+                // 背景グラデーション
+                LinearGradient(
+                    colors: [Color(.systemBackground), Color(.systemGray6)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // ヘッダー
+                        headerSection
+                        
+                        // 機能一覧
+                        featuresSection
+                        
+                        // 購入ボタン
+                        if store.isLoading {
+                            ProgressView()
+                                .padding()
+                        } else if store.isPremium {
+                            premiumActiveSection
+                        } else {
+                            purchaseSection
+                        }
+                        
+                        // 復元ボタン
+                        restoreButton
                     }
-                    
-                    // 復元ボタン
-                    restoreButton
-                    
-                    // 注意事項
-                    disclaimerSection
+                    .padding(.horizontal, 24)
+                    .padding(.top, 40)
+                    .padding(.bottom, 32)
                 }
-                .padding()
             }
-            .navigationTitle("Premiumにアップグレード")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("閉じる") {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .symbolRenderingMode(.hierarchical)
                     }
                 }
             }
@@ -49,7 +64,6 @@ struct PaywallView: View {
                 Text(alertMessage)
             }
             .task {
-                // Ensure products are loaded when the view appears
                 await store.loadProducts()
             }
         }
@@ -57,129 +71,185 @@ struct PaywallView: View {
     
     // MARK: - ヘッダー
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "star.circle.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.yellow)
-            
-            Text("陸ログ Premium")
-                .font(.title.bold())
-            
-            Text("すべての機能を解放")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-        }
-        .padding(.top)
-    }
-    
-    // MARK: - 機能比較
-    private var featureComparisonSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Premium機能")
-                .font(.headline)
-            
-            featureRow(icon: "infinity", text: "レース記録無制限", isPremium: true)
-            featureRow(icon: "eye.slash", text: "広告なし", isPremium: true)
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-    
-    private func featureRow(icon: String, text: String, isPremium: Bool) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(isPremium ? .blue : .gray)
-                .frame(width: 24)
-            
-            Text(text)
-                .font(.subheadline)
-            
-            Spacer()
-            
-            if isPremium {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.blue)
-            }
-        }
-    }
-    
-    // MARK: - プラン選択
-    private var planSelectionSection: some View {
         VStack(spacing: 16) {
-            // If the user already has premium, show a simple message
-            if store.isPremium {
-                VStack {
-                    Text("すでにプレミアム会員です")
-                        .font(.headline)
-                        .foregroundColor(.green)
-                    Button("閉じる") { dismiss() }
-                }
-
-            } else {
-                // Lifetime/product card
-                if let product = store.lifetimeProduct {
-                    PremiumPlanCard(
-                        title: "買い切り",
-                        subtitle: "一度の購入で永久に使用",
-                        price: product.displayPrice,
-                        isRecommended: true,
-                        isPurchasing: isPurchasing
-                    ) {
-                        Task { await purchaseProduct(product) }
-                    }
-                }
-
-                // Monthly product card
-                if let product = store.monthlyProduct {
-                    PremiumPlanCard(
-                        title: "月額プラン",
-                        subtitle: "いつでもキャンセル可能",
-                        price: "\(product.displayPrice)/月",
-                        isRecommended: false,
-                        isPurchasing: isPurchasing
-                    ) {
-                        Task { await purchaseProduct(product) }
-                    }
-                }
+            // アイコン
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+                
+                Image(systemName: "infinity")
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            .shadow(color: .blue.opacity(0.3), radius: 20, x: 0, y: 10)
+            
+            VStack(spacing: 8) {
+                Text("Premium Plan")
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                
+                Text("一度の購入で、すべての機能を無制限に。")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
         }
+        .padding(.top, 20)
+    }
+    
+    // MARK: - 機能一覧
+    private var featuresSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            featureRow(
+                icon: "infinity.circle.fill",
+                iconColor: .blue,
+                title: "無制限の保存",
+                description: "レース記録を無制限に保存できます"
+            )
+            
+            Divider()
+                .padding(.leading, 48)
+            
+            featureRow(
+                icon: "eye.slash.fill",
+                iconColor: .purple,
+                title: "広告なし",
+                description: "すべての広告を非表示にします"
+            )
+            
+            Divider()
+                .padding(.leading, 48)
+            
+            featureRow(
+                icon: "star.fill",
+                iconColor: .orange,
+                title: "すべての機能",
+                description: "今後追加される機能もすべて利用可能"
+            )
+        }
+        .padding(24)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+    
+    private func featureRow(icon: String, iconColor: Color, title: String, description: String) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(iconColor)
+                .frame(width: 32)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+    
+    // MARK: - 購入セクション
+    private var purchaseSection: some View {
+        VStack(spacing: 16) {
+            if let product = store.lifetimeProduct {
+                Button {
+                    Task { await purchaseProduct(product) }
+                } label: {
+                    HStack {
+                        Text("¥500で購入")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        if isPurchasing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.right")
+                                .font(.headline)
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(14)
+                    .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+                }
+                .disabled(isPurchasing)
+            }
+            
+            Text("買い切り型で、追加料金は一切かかりません")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+    
+    // MARK: - プレミアム有効
+    private var premiumActiveSection: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.green)
+            
+            Text("すでにプレミアム会員です")
+                .font(.headline)
+                .foregroundColor(.green)
+        }
+        .padding(.vertical)
     }
     
     // MARK: - 復元ボタン
     private var restoreButton: some View {
-        Button {
-            Task {
-                isPurchasing = true
-                await store.restorePurchases()
-                isPurchasing = false
-                
-                if store.isPremium {
-                    alertMessage = "購入を復元しました"
-                    showAlert = true
-                } else {
-                    alertMessage = "復元可能な購入が見つかりませんでした"
-                    showAlert = true
+        VStack(spacing: 20) {
+            Button {
+                Task {
+                    isPurchasing = true
+                    await store.restorePurchases()
+                    isPurchasing = false
+                    
+                    if store.isPremium {
+                        alertMessage = "購入を復元しました"
+                        showAlert = true
+                    } else {
+                        alertMessage = "復元可能な購入が見つかりませんでした"
+                        showAlert = true
+                    }
                 }
+            } label: {
+                Text("購入を復元")
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
             }
-        } label: {
-            Text("購入を復元")
-                .font(.subheadline)
-                .foregroundColor(.blue)
+            .disabled(isPurchasing)
+            
+            policyLinks
         }
-        .disabled(isPurchasing)
     }
     
-    // MARK: - 注意事項
-    private var disclaimerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("• 買い切りプランは一度の購入で永久に利用できます")
-            Text("• 月額プランは自動更新されます")
-            Text("• キャンセルはApp Storeの設定から行えます")
+    private var policyLinks: some View {
+        HStack(spacing: 20) {
+            Link("利用規約", destination: URL(string: "https://tako-1012.github.io/riku-log_policies/terms.html")!)
+            Link("プライバシーポリシー", destination: URL(string: "https://tako-1012.github.io/riku-log_policies/privacy-policy.html")!)
         }
         .font(.caption)
         .foregroundColor(.secondary)
-        .padding(.horizontal)
+        .padding(.top, 4)
     }
     
     // MARK: - 購入処理
@@ -198,73 +268,6 @@ struct PaywallView: View {
             alertMessage = store.errorMessage ?? (error.localizedDescription)
             showAlert = true
         }
-    }
-}
-
-// MARK: - Premium Plan Card
-struct PremiumPlanCard: View {
-    let title: String
-    let subtitle: String
-    let price: String
-    let isRecommended: Bool
-    let isPurchasing: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    if isRecommended {
-                        Text("おすすめ")
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.blue)
-                            .cornerRadius(4)
-                    }
-                }
-                
-                Divider()
-                
-                HStack {
-                    Text(price)
-                        .font(.title2.bold())
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                    
-                    if isPurchasing {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                    }
-                }
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isRecommended ? Color.blue : Color.gray.opacity(0.3), lineWidth: isRecommended ? 2 : 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(isPurchasing)
     }
 }
 

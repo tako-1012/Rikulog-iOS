@@ -15,12 +15,27 @@ struct PaceCalculatorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                modeSection
-                distanceSection
-                timeSection
-                paceSection
-                calculateButtonSection
+                // 結果を上部に表示（カード形式）
                 resultSection
+                
+                modeSection
+                
+                // 入力モードに応じたセクション表示
+                Group {
+                    switch viewModel.mode {
+                    case .calculatePace:
+                        distanceSection
+                        timeSection
+                    case .calculateTime:
+                        distanceSection
+                        paceSection
+                    case .calculateDistance:
+                        timeSection
+                        paceSection
+                    }
+                }
+                
+                calculateButtonSection
                 lapPresetSection
             }
             .scrollDismissesKeyboard(.interactively)
@@ -60,20 +75,16 @@ struct PaceCalculatorView: View {
     }
     
     private var distanceSection: some View {
-        Group {
-            if viewModel.mode != .calculateDistance {
-                Section("距離") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if !distances.isEmpty {
-                            distanceSelectorPart
-                            Divider()
-                        }
-                        distanceInputPart
-                    }
-                    .onChange(of: viewModel.distance) { _, new in
-                        viewModel.handleDistanceInputChange()
-                    }
+        Section("距離") {
+            VStack(alignment: .leading, spacing: 12) {
+                if !distances.isEmpty {
+                    distanceSelectorPart
+                    Divider()
                 }
+                distanceInputPart
+            }
+            .onChange(of: viewModel.distance) { _, new in
+                viewModel.handleDistanceInputChange()
             }
         }
     }
@@ -141,40 +152,31 @@ struct PaceCalculatorView: View {
     }
     
     private var timeSection: some View {
-        Group {
-            if viewModel.mode != .calculateTime {
-                Section("時間") {
-                    // 修正: simpleFocusBinding を .constant(false) にして監視を無効化
-                    TimeInputFields(
-                        hoursText: $viewModel.hoursText,
-                        minutesText: $viewModel.minutesText,
-                        secondsText: $viewModel.secondsText,
-                        focusedField: _focusedTimeField,
-                        simpleFocusBinding: .constant(false), // ← ここを修正！これで勝手に閉じなくなります
-                        onNormalize: { viewModel.normalizeTimeFields() },
-                        accessoryEnabled: true
-                    )
-                }
-            }
+        Section("時間") {
+            TimeInputFields(
+                hoursText: $viewModel.hoursText,
+                minutesText: $viewModel.minutesText,
+                secondsText: $viewModel.secondsText,
+                focusedField: _focusedTimeField,
+                simpleFocusBinding: .constant(false),
+                onNormalize: { viewModel.normalizeTimeFields() },
+                accessoryEnabled: true
+            )
         }
     }
     
     private var paceSection: some View {
-        Group {
-            if viewModel.mode != .calculatePace {
-                Section("ペース (/km)") {
-                    // 修正: simpleFocusBinding を .constant(false) にして監視を無効化
-                    TimeInputFields(
-                        hoursText: .constant(""),
-                        minutesText: $viewModel.paceMinutesText,
-                        secondsText: $viewModel.paceSecondsText,
-                        focusedField: _focusedPaceField,
-                        simpleFocusBinding: .constant(false), // ← ここを修正！
-                        onNormalize: { viewModel.normalizePaceFields() },
-                        accessoryEnabled: true
-                    )
-                }
-            }
+        Section("ペース (/km)") {
+            TimeInputFields(
+                hoursText: .constant(""),
+                minutesText: $viewModel.paceMinutesText,
+                secondsText: $viewModel.paceSecondsText,
+                focusedField: _focusedPaceField,
+                simpleFocusBinding: .constant(false),
+                onNormalize: { viewModel.normalizePaceFields() },
+                accessoryEnabled: true,
+                showHours: false // ペース入力では時間を非表示
+            )
         }
     }
     
@@ -206,11 +208,36 @@ struct PaceCalculatorView: View {
     private var resultSection: some View {
         Group {
             if !viewModel.resultText.isEmpty {
-                Section("結果") {
-                    Text(viewModel.resultText)
-                        .font(.title2)
-                        .foregroundStyle(.primary)
+                VStack(spacing: 12) {
+                    Text("計算結果")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    HStack(alignment: .center) {
+                        Text(viewModel.resultMainValue) // ViewModelにcomputed propertyを追加する必要があります
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            UIPasteboard.general.string = viewModel.resultText
+                            let generator = UINotificationFeedbackGenerator()
+                            generator.notificationOccurred(.success)
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.title2)
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(12)
                 }
+                .padding(.horizontal)
+                .padding(.top, 8)
             }
         }
     }

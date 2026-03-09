@@ -251,9 +251,9 @@ struct AddLapView: View {
             } message: {
                 Text(errorMessage)
             }
-            .onChange(of: selectedPreset) { _ in updateAutoLaps() }
-            .onChange(of: totalDistance) { _ in updateAutoLaps() }
-            .onChange(of: distanceText) { new in
+            .onChange(of: selectedPreset) { _, _ in updateAutoLaps() }
+            .onChange(of: totalDistance) { _, _ in updateAutoLaps() }
+            .onChange(of: distanceText) { _, new in
                 // カスタム距離の入力中に毎文字で重い再計算を行わないようデバウンス
                 guard selectedPreset == "custom" else { return }
                 distanceTextWorkItem?.cancel()

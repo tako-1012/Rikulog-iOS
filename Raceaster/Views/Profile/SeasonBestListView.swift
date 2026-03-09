@@ -41,7 +41,9 @@ struct SeasonBestListView: View {
 
             // for each registered distance, find best in season
             var list: [SeasonDistanceBest] = []
-            for dist in distances {
+            // 距離モデルの重複を (raceType, distanceKm) でユニーク化
+            let uniqDistances = uniqueDistanceModels(distances)
+            for dist in uniqDistances {
                 let inSeason = races.filter { r in
                     dist.matches(distance: r.totalDistance) && r.raceType == dist.raceType && r.date >= seasonStart && r.date <= seasonEnd
                 }
@@ -50,8 +52,10 @@ struct SeasonBestListView: View {
                 }
             }
 
-            if !list.isEmpty {
-                dict[year] = list.sorted(by: { $0.distanceName < $1.distanceName })
+            // 距離名単位で重複（同距離名が複数モデルに存在）を排除し、最良タイムのみ残す
+            let deduped = dedupeSeasonBestByDistanceName(list)
+            if !deduped.isEmpty {
+                dict[year] = deduped.sorted(by: { $0.distanceName < $1.distanceName })
             }
         }
 
@@ -218,6 +222,33 @@ struct SeasonBestListView: View {
         let m = total / 60
         let s = total % 60
         return String(format: "%d:%02d", m, s)
+    }
+}
+
+// MARK: - Helpers (dedupe)
+extension SeasonBestListView {
+    /// RaceDistance を (raceType, distanceKm丸め) キーでユニーク化
+    private func uniqueDistanceModels(_ items: [RaceDistance]) -> [RaceDistance] {
+        var seen: Set<String> = []
+        var result: [RaceDistance] = []
+        for d in items {
+            let key = "\(d.raceType.rawValue)-\(String(format: "%.6f", d.distanceKm))"
+            if !seen.contains(key) { seen.insert(key); result.append(d) }
+        }
+        return result
+    }
+
+    /// 同じ距離名が複数エントリある場合、ベスト（最小time）だけ残す
+    private func dedupeSeasonBestByDistanceName(_ list: [SeasonDistanceBest]) -> [SeasonDistanceBest] {
+        var bestByName: [String: SeasonDistanceBest] = [:]
+        for item in list {
+            if let existing = bestByName[item.distanceName] {
+                if item.time < existing.time { bestByName[item.distanceName] = item }
+            } else {
+                bestByName[item.distanceName] = item
+            }
+        }
+        return Array(bestByName.values)
     }
 }
 

@@ -10,17 +10,34 @@ final class StoreKitManager: ObservableObject {
     @Published var isLoading: Bool = true
     @Published var isPremium: Bool = false
     @Published var products: [Product] = []
-    @Published var monthlyProduct: Product? = nil
     @Published var lifetimeProduct: Product? = nil
     @Published var errorMessage: String? = nil
 
-    private let productIDs: [String] = ["rikulog_premium_monthly", "rikulog_premium_lifetime"]
+    private let productIDs: [String] = ["rikulog_premium_lifetime"]
     private var transactionListenerTask: Task<Void, Never>? = nil
+    
+    // UserDefaults キー
+    private let premiumCacheKey = "StoreKitManager_isPremium_Cache"
 
     private init(skipSetup: Bool = false) {
+        // 起動時: キャッシュから isPremium を復元（UX改善）
+        let cachedPremium = UserDefaults.standard.bool(forKey: premiumCacheKey)
+        self.isPremium = cachedPremium
+        
         if !skipSetup {
+            // 1. 初期化（同期的に完了）
+            Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+                await self.loadProducts()
+                await self.updateCustomerProductStatus()
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
+            // 2. トランザクションリスナーは別途非同期で起動（ブロックしない）
             transactionListenerTask = Task.detached(priority: .background) { [weak self] in
-                await self?.setup()
+                guard let self else { return }
+                await self.listenForTransactions()
             }
         }
     }
@@ -35,24 +52,14 @@ final class StoreKitManager: ObservableObject {
         mgr.isLoading = false
         mgr.isPremium = false
         mgr.products = []
-        mgr.monthlyProduct = nil
         mgr.lifetimeProduct = nil
         mgr.errorMessage = nil
         return mgr
     }
 
     private func setup() async {
-        // 1. まず商品情報を読み込む
         await loadProducts()
-
-        // 2. 購入状態を更新する
         await updateCustomerProductStatus()
-
-        // 3. ここで「読み込み中」を解除！（これでグルグルが止まります）
-        await MainActor.run { self.isLoading = false }
-
-        // 4. 監視処理は終わらないので、最後に実行（または別タスクにする）
-        //    これより下にコードを書くと実行されないので注意
         await listenForTransactions()
     }
 
@@ -61,7 +68,6 @@ final class StoreKitManager: ObservableObject {
             let fetched = try await Product.products(for: Set(productIDs))
             await MainActor.run {
                 self.products = fetched
-                self.monthlyProduct = fetched.first(where: { $0.id == "rikulog_premium_monthly" })
                 self.lifetimeProduct = fetched.first(where: { $0.id == "rikulog_premium_lifetime" })
             }
         } catch {
@@ -151,6 +157,10 @@ final class StoreKitManager: ObservableObject {
         print("🏁 [StoreKitManager] 最終判定: \(hasPremium)")
         #endif
 
-        await MainActor.run { self.isPremium = hasPremium }
+        await MainActor.run {
+            self.isPremium = hasPremium
+            // キャッシュを更新して次の起動時の読み込みを高速化
+            UserDefaults.standard.set(hasPremium, forKey: self.premiumCacheKey)
+        }
     }
 }

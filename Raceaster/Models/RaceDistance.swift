@@ -32,12 +32,19 @@ final class RaceDistance {
     /// デフォルトの種目リストを作成
     static func createDefaultDistances() -> [RaceDistance] {
         return [
+            // スプリント
+            RaceDistance(name: "100m", distanceKm: 0.1, raceType: .track, sortOrder: 0),
+            RaceDistance(name: "200m", distanceKm: 0.2, raceType: .track, sortOrder: 1),
+            RaceDistance(name: "300m", distanceKm: 0.3, raceType: .track, sortOrder: 2),
+            RaceDistance(name: "400m", distanceKm: 0.4, raceType: .track, sortOrder: 3),
+            
             // トラック種目
-            RaceDistance(name: "800m", distanceKm: 0.8, raceType: .track, sortOrder: 1),
-            RaceDistance(name: "1500m", distanceKm: 1.5, raceType: .track, sortOrder: 2),
-            RaceDistance(name: "3000m", distanceKm: 3.0, raceType: .track, sortOrder: 3),
-            RaceDistance(name: "5000m", distanceKm: 5.0, raceType: .track, sortOrder: 4),
-            RaceDistance(name: "10000m", distanceKm: 10.0, raceType: .track, sortOrder: 5),
+            RaceDistance(name: "800m", distanceKm: 0.8, raceType: .track, sortOrder: 4),
+            RaceDistance(name: "1500m", distanceKm: 1.5, raceType: .track, sortOrder: 5),
+            RaceDistance(name: "3000m", distanceKm: 3.0, raceType: .track, sortOrder: 6),
+            RaceDistance(name: "3000mSC", distanceKm: 3.0, raceType: .track, sortOrder: 7),
+            RaceDistance(name: "5000m", distanceKm: 5.0, raceType: .track, sortOrder: 8),
+            RaceDistance(name: "10000m", distanceKm: 10.0, raceType: .track, sortOrder: 9),
             
             // ロード種目
             RaceDistance(name: "5km", distanceKm: 5.0, raceType: .road, sortOrder: 10),

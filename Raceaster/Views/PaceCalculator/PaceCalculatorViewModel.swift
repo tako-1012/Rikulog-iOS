@@ -262,6 +262,17 @@ class PaceCalculatorViewModel: ObservableObject {
         selectedRaceType = nil
         selectedDistanceName = nil
     }
+    /// 結果のメイン数値部分のみ抽出（UI表示用）
+    var resultMainValue: String {
+        if resultText.hasPrefix("ペース: ") {
+            return resultText.replacingOccurrences(of: "ペース: ", with: "")
+        } else if resultText.hasPrefix("タイム: ") {
+            return resultText.replacingOccurrences(of: "タイム: ", with: "")
+        } else if resultText.hasPrefix("距離: ") {
+            return resultText.replacingOccurrences(of: "距離: ", with: "")
+        }
+        return resultText
+    }
 }
 
 // ラッププリセットの選択肢を距離に応じて変更

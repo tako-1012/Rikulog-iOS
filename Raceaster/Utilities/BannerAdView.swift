@@ -12,9 +12,7 @@ struct BannerAdView: UIViewRepresentable {
 
     /// 本番用広告ID（リリース時に使用）
     struct ProductionAdUnitIDs {
-        static let raceList = "ca-app-pub-6961478133837893/2281369709"
-        static let profile = "ca-app-pub-6961478133837893/9398260631"
-        static let settings = "ca-app-pub-6961478133837893/4712269530"
+        static let unified = "ca-app-pub-6961478133837893/9398260631"
     }
 
     func makeUIView(context: Context) -> BannerView {
@@ -107,6 +105,24 @@ struct BannerAdView: UIViewRepresentable {
     }
 }
 
+/// Anchored adaptive banner that stretches to available width and reserves height during loading.
+struct AdaptiveBannerAdView: View {
+    let adUnitID: String
+    var minHeight: CGFloat = 50
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let adaptiveSize = currentOrientationAnchoredAdaptiveBanner(width: width)
+
+            BannerAdView(adUnitID: adUnitID, adSize: adaptiveSize)
+                .frame(width: width, height: max(minHeight, adaptiveSize.size.height))
+        }
+        // Reserve space up-front to prevent layout jumps while the ad loads
+        .frame(height: minHeight)
+    }
+}
+
 #Preview {
     VStack {
         Text("広告プレビュー")
@@ -114,12 +130,7 @@ struct BannerAdView: UIViewRepresentable {
 
         Spacer()
 
-        // テスト広告
-        BannerAdView(
-            adUnitID: BannerAdView.testBannerID,
-            adSize: AdSizeBanner
-        )
-        .frame(height: 50)
-        .background(Color.gray.opacity(0.2))
+        AdaptiveBannerAdView(adUnitID: BannerAdView.testBannerID)
+            .background(Color.gray.opacity(0.2))
     }
 }

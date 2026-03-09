@@ -17,8 +17,11 @@ struct VDOTCalculator {
     /// - Parameters:
     ///   - distanceKm: 距離（km）
     ///   - timeSeconds: タイム（秒）
-    /// - Returns: VDOT値
+    /// - Returns: VDOT値（短距離 400m 以下では 0 を返す）
     static func calculateVDOT(distanceKm: Double, timeSeconds: Double) -> Double {
+        // 短距離（400m 以下）は VDOT 対象外
+        if distanceKm < 0.5 { return 0 }
+        
         // 入力値の検証（ゼロ除算・異常値防止）
         guard distanceKm > 0 && distanceKm < 1000 else { return 0 }
         guard timeSeconds > 0 && timeSeconds < 86400 * 7 else { return 0 } // 最大7日
