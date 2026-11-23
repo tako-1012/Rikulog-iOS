@@ -1,10 +1,12 @@
 import SwiftUI
 import SwiftData
+import StoreKit
 import UIKit
 
 struct AddRaceView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
     
     // MARK: - 状態管理 (元のプロパティをすべて保持)
     @State private var raceName: String = ""
@@ -27,6 +29,8 @@ struct AddRaceView: View {
     @State private var showRankAlert = false
     @State private var rankAlertTitle = ""
     @State private var rankAlertMessage = ""
+    /// 自己ベスト更新時の祝福画面（nil 以外で表示）
+    @State private var pbCelebration: PBCelebration? = nil
     @State private var selectedDistanceId: PersistentIdentifier? = nil
     @State private var isOtherSelected = false
     @State private var customDistanceText: String = ""
@@ -44,6 +48,7 @@ struct AddRaceView: View {
     @FocusState private var focusedTimeField: TimeInputFields.FocusedField?
 
     @Query(sort: \RaceDistance.distanceKm) private var distances: [RaceDistance]
+    @Query private var userProfiles: [UserProfile]
     var raceToEdit: RaceRecord? = nil
 
     /// 現在選択中のフィールド種目
@@ -161,6 +166,20 @@ struct AddRaceView: View {
             } message: {
                 Text(rankAlertMessage)
             }
+            .sheet(item: $pbCelebration, onDismiss: finishAfterCelebration) { celebration in
+                PBCelebrationView(celebration: celebration, userProfile: userProfiles.first)
+            }
+        }
+    }
+
+    /// 祝福画面を閉じたら記録画面を閉じ、条件を満たせば App Store レビューを依頼する
+    private func finishAfterCelebration() {
+        dismiss()
+        guard ReviewRequestPolicy.shouldRequest() else { return }
+        ReviewRequestPolicy.markRequested()
+        // 記録画面が閉じるアニメーションの後に表示する
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            requestReview()
         }
     }
 }
@@ -343,6 +362,7 @@ extension AddRaceView {
         let total = h * 3600 + m * 60 + s
         if total <= 0 || total >= 86400 { errorMessage = String(localized: "race.time.section"); showingError = true; return }
 
+        var savedNewRace: RaceRecord? = nil
         do {
                 if let r = raceToEdit {
                 // 既存レコード更新
@@ -367,20 +387,21 @@ extension AddRaceView {
                 let new = RaceRecord(raceName: raceName, date: date, raceType: raceType, totalDistance: dist, totalTime: total, memo: memo, trackMeetType: (raceType == .track ? trackMeetType : nil), ranking: Int(rankingText), laps: lapModels, officialTime: Double(officialTimeText) ?? total, includeInVDOT: includeInVDOT, group: Int(groupText), isRelay: (raceType == .road ? isRelay : false), relayStage: Int(relayStageText))
                 lapModels.forEach { $0.raceRecord = new; modelContext.insert($0) }
                 modelContext.insert(new)
+                savedNewRace = new
             }
             try modelContext.save()
-            
+
             // Haptic フィードバック
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
-            
+
             // ランキング判定（新規作成時のみ）
-            if raceToEdit == nil {
-                checkRanking(distance: dist, time: total, raceType: raceType)
+            if let new = savedNewRace {
+                checkRanking(for: new)
             }
-            
-            // ランキングアラート表示中はdismissしない（アラートのボタンでdismiss）
-            if !showRankAlert {
+
+            // アラート・祝福画面の表示中はdismissしない（閉じたタイミングでdismiss）
+            if !showRankAlert && pbCelebration == nil {
                 dismiss()
             }
         } catch {
@@ -414,6 +435,7 @@ extension AddRaceView {
         // distanceKm を totalDistance として使用（種目識別子として機能）
         let identifierKm = fd.distanceKm
 
+        var savedNewRace: RaceRecord? = nil
         do {
             if let r = raceToEdit {
                 r.raceName = raceName; r.date = date; r.raceType = .field
@@ -435,43 +457,63 @@ extension AddRaceView {
                 new.attemptResults = attemptsJSON
                 new.windSpeed = ws; new.isWindAided = windAided
                 modelContext.insert(new)
+                savedNewRace = new
             }
             try modelContext.save()
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
-            dismiss()
+
+            // 自己ベスト判定（新規作成時のみ）
+            if let new = savedNewRace {
+                checkFieldPB(for: new, event: fd)
+            }
+            if pbCelebration == nil {
+                dismiss()
+            }
         } catch {
             errorMessage = String(localized: "common.error"); showingError = true
         }
     }
 
-    private func checkRanking(distance: Double, time: Double, raceType: RaceType) {
+    private func checkRanking(for race: RaceRecord) {
         let matchingDistance = distances.first { d in
-            d.matches(distance: distance) && d.raceType == raceType
+            d.matches(distance: race.totalDistance) && d.raceType == race.raceType
         }
         guard let distModel = matchingDistance else { return }
-        
+
         let descriptor = FetchDescriptor<RaceRecord>()
         guard let allRaces = try? modelContext.fetch(descriptor) else { return }
         let matchingRaces = allRaces.filter { r in
             distModel.matches(distance: r.totalDistance) && r.raceType == distModel.raceType
         }
-        
+
         // 2件以上ないとランキングの意味がない
         guard matchingRaces.count > 1 else { return }
-        
-        // タイム順にソートしてランキングを判定
-        let sorted = matchingRaces.sorted { $0.totalTime < $1.totalTime }
-        guard let rank = sorted.firstIndex(where: { abs($0.totalTime - time) < 0.01 }) else { return }
-        let position = rank + 1 // 1-indexed
-        
+
+        // 保存後の値（ロードは切り上げ済み）で比較する
+        let time = race.totalTime
+        let others = matchingRaces.filter { $0.id != race.id }
+
+        // 自己ベスト更新（過去の最速より速い）→ 祝福画面
+        if let previousBest = others.map(\.totalTime).min(), time < previousBest {
+            pbCelebration = PBCelebration(
+                race: race,
+                eventName: distModel.localizedName,
+                recordText: TimeFormatter.formatTime(time, for: race.raceType),
+                improvementText: PBImprovementFormatter.time(previousBest - time, raceType: race.raceType)
+            )
+            return
+        }
+
+        // 2〜5位の判定（同タイムは上位として扱う）
+        let position = others.filter { $0.totalTime < time }.count + 1
+
         let name = distModel.localizedName
         let totalCount = matchingRaces.count
-        
+
         switch position {
         case 1:
-            rankAlertTitle = String(localized: "rank.alert.pb.title")
-            rankAlertMessage = String(format: String(localized: "rank.alert.pb.message %@"), name)
+            return // 自己ベストと同タイム：祝福・アラートなし
         case 2:
             rankAlertTitle = String(localized: "rank.alert.2nd.title")
             rankAlertMessage = String(format: String(localized: "rank.alert.2nd.message %@ %lld"), name, totalCount)
@@ -486,6 +528,27 @@ extension AddRaceView {
         }
         
         showRankAlert = true
+    }
+
+    /// フィールド種目の自己ベスト判定（記録が大きいほど優秀）
+    private func checkFieldPB(for race: RaceRecord, event: RaceDistance) {
+        let descriptor = FetchDescriptor<RaceRecord>()
+        guard let allRaces = try? modelContext.fetch(descriptor) else { return }
+        let others = allRaces.filter { r in
+            r.id != race.id && r.raceType == .field && event.matches(distance: r.totalDistance)
+        }
+        let value = race.fieldHeight ?? race.fieldDistance ?? 0
+        let previousBest = others.map { $0.fieldHeight ?? $0.fieldDistance ?? 0 }.max() ?? 0
+
+        // 初めての記録、または過去のベストを超えていない場合は何もしない
+        guard previousBest > 0, value > previousBest else { return }
+
+        pbCelebration = PBCelebration(
+            race: race,
+            eventName: event.localizedName,
+            recordText: formatFieldRecord(value),
+            improvementText: PBImprovementFormatter.field(value - previousBest)
+        )
     }
 
     private func resetDistanceSelection() {
