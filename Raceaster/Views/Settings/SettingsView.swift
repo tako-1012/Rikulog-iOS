@@ -129,14 +129,14 @@ struct SettingsView: View {
             }
             .navigationTitle("settings.title")
             .sheet(isPresented: $showingPrivacyPolicy) {
-                if let url = URL(string: "https://tako-1012.github.io/riku-log_policies/privacy-policy.html") {
+                if let url = URL(string: "https://tako-1012.github.io/riku-log-policies/privacy-policy.html") {
                     SafariView(url: url)
                 } else {
                     PrivacyPolicyView()
                 }
             }
             .sheet(isPresented: $showingTerms) {
-                if let url = URL(string: "https://tako-1012.github.io/riku-log_policies/terms.html") {
+                if let url = URL(string: "https://tako-1012.github.io/riku-log-policies/terms.html") {
                     SafariView(url: url)
                 } else {
                     TermsOfServiceView()

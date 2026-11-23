@@ -244,8 +244,8 @@ struct PaywallView: View {
     
     private var policyLinks: some View {
         HStack(spacing: 20) {
-            Link(String(localized: "paywall.terms"), destination: URL(string: "https://tako-1012.github.io/riku-log_policies/terms.html")!)
-            Link(String(localized: "paywall.privacy"), destination: URL(string: "https://tako-1012.github.io/riku-log_policies/privacy-policy.html")!)
+            Link(String(localized: "paywall.terms"), destination: URL(string: "https://tako-1012.github.io/riku-log-policies/terms.html")!)
+            Link(String(localized: "paywall.privacy"), destination: URL(string: "https://tako-1012.github.io/riku-log-policies/privacy-policy.html")!)
         }
         .font(.caption)
         .foregroundColor(.secondary)
