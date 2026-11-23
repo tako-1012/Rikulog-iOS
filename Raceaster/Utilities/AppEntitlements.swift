@@ -10,8 +10,6 @@ final class AppEntitlements: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     private init() {
-        // Use StoreKitManager as the single source of truth for premium state
-        // (migrate away from legacy StoreManager)
         StoreKitManager.shared.$isPremium
             .receive(on: DispatchQueue.main)
             .assign(to: \.hasPremium, on: self)
@@ -28,18 +26,20 @@ final class AppEntitlements: ObservableObject {
         return hasPremium
     }
     
-    /// 広告を表示すべきか（修正版）
+    /// 広告を表示すべきか
     var shouldShowAds: Bool {
         if isDebugPremium {
             return false
         }
         return !hasPremium
     }
-    
-    // デバッグビルドでは制限を緩める
+
+    // デバッグビルドでのみ有効なフラグ。
+    // Xcode の Run Scheme > Arguments に "-debug_premium_enabled YES" を追加すると Premium 状態になる。
+    // 引数なし（デフォルト false）で無料ユーザーの広告・50件制限を検証できる。
     var isDebugPremium: Bool {
         #if DEBUG
-        return true
+        return UserDefaults.standard.bool(forKey: "debug_premium_enabled")
         #else
         return false
         #endif

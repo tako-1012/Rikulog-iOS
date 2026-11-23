@@ -33,4 +33,9 @@ final class Lap {
         self.distance = distance
         self.time = time
     }
+
+    /// `LapInput`（入力用一時モデル）から `Lap`（永続モデル）を生成する
+    static func from(_ input: LapInput, lapNumber: Int) -> Lap {
+        Lap(lapNumber: lapNumber, distance: input.distance, time: input.time)
+    }
 }

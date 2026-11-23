@@ -23,8 +23,29 @@ struct DistancePickerView: View {
                         }) {
                             HStack {
                                 VStack(alignment: .leading) {
-                                    Text(dist.name)
-                                    Text(String(format: "%.3f km", dist.distanceKm))
+                                    Text(dist.localizedName)
+                                    if !dist.isFieldEvent {
+                                        Text(String(format: "%.3f km", dist.distanceKm))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+
+                    // フィールド種目ではカスタム距離入力不要
+                    if raceType != .field {
+                        Button(action: {
+                            selectedDistanceId = nil
+                            isOtherSelected = true
+                            useCustomDistance = true
+                        }) {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("distance.custom")
+                                    Text("distance.custom.input")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -32,48 +53,34 @@ struct DistancePickerView: View {
                             }
                         }
                     }
-
-                    Button(action: {
-                        selectedDistanceId = nil
-                        isOtherSelected = true
-                        useCustomDistance = true
-                    }) {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("その他")
-                                Text("カスタム距離を入力")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                    }
                 } label: {
                     HStack {
-                        if isOtherSelected {
+                        if isOtherSelected && raceType != .field {
                             VStack(alignment: .leading) {
-                                Text("その他")
+                                Text("distance.custom")
                                     .font(.body)
                                 if let v = Double(customDistanceText), v > 0 {
                                     Text(String(format: "%.3f km", v))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 } else {
-                                    Text("種目を選択")
+                                    Text("distance.select")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                             }
                         } else if let selected = distances.first(where: { $0.persistentModelID == selectedDistanceId }) {
                             VStack(alignment: .leading) {
-                                Text(selected.name)
-                                Text(String(format: "%.3f km", selected.distanceKm))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                Text(selected.localizedName)
+                                if !selected.isFieldEvent {
+                                    Text(String(format: "%.3f km", selected.distanceKm))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         } else {
                             VStack(alignment: .leading) {
-                                Text("種目を選択")
+                                Text("distance.select.event")
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -84,16 +91,18 @@ struct DistancePickerView: View {
                 }
             }
 
-            if let selected = distances.first(where: { $0.persistentModelID == selectedDistanceId }), !isOtherSelected {
+            // フィールド種目では距離表示行を非表示
+            if let selected = distances.first(where: { $0.persistentModelID == selectedDistanceId }),
+               !isOtherSelected, !selected.isFieldEvent {
                 HStack {
-                    Text("選択距離: ")
+                    Text("distance.selected.label")
                     Text(String(format: "%.3f km", selected.distanceKm)).bold()
                 }
             }
 
             if useCustomDistance && isOtherSelected {
                 HStack {
-                    AccessoryTextField(text: $customDistanceText, placeholder: "距離 (km)", keyboardType: .decimalPad, isFirstResponder: nil, showAccessory: accessoryEnabled)
+                    AccessoryTextField(text: $customDistanceText, placeholder: String(localized: "distance.km.placeholder"), keyboardType: .decimalPad, isFirstResponder: nil, showAccessory: accessoryEnabled)
                     Text("km")
                 }
             }

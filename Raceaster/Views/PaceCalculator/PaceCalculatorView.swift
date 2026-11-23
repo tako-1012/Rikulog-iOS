@@ -37,9 +37,10 @@ struct PaceCalculatorView: View {
                 
                 calculateButtonSection
                 lapPresetSection
+                treadmillSection
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("ペース計算")
+            .navigationTitle("calculator.title")
             .navigationBarTitleDisplayMode(.inline)
             .onChange(of: distances) { _, newDistances in
                 viewModel.distances = newDistances
@@ -64,18 +65,18 @@ struct PaceCalculatorView: View {
     // MARK: - View Components
     
     private var modeSection: some View {
-        Section("計算モード") {
-            Picker("計算する値", selection: $viewModel.mode) {
-                Text("ペース").tag(PaceCalculatorViewModel.CalculationMode.calculatePace)
-                Text("時間").tag(PaceCalculatorViewModel.CalculationMode.calculateTime)
-                Text("距離").tag(PaceCalculatorViewModel.CalculationMode.calculateDistance)
+        Section("calculator.mode.section") {
+            Picker("calculator.mode.picker.label", selection: $viewModel.mode) {
+                Text("calculator.mode.pace").tag(PaceCalculatorViewModel.CalculationMode.calculatePace)
+                Text("calculator.mode.time").tag(PaceCalculatorViewModel.CalculationMode.calculateTime)
+                Text("calculator.mode.distance").tag(PaceCalculatorViewModel.CalculationMode.calculateDistance)
             }
             .pickerStyle(.segmented)
         }
     }
     
     private var distanceSection: some View {
-        Section("距離") {
+        Section("calculator.distance.section") {
             VStack(alignment: .leading, spacing: 12) {
                 if !distances.isEmpty {
                     distanceSelectorPart
@@ -91,36 +92,36 @@ struct PaceCalculatorView: View {
     
     private var distanceSelectorPart: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("登録種目から選択")
+            Text("calculator.distance.from.events")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Picker("種目", selection: $viewModel.selectedDistanceId) {
-                Text("選択しない").tag(nil as PersistentIdentifier?)
+            Picker("calculator.distance.picker.label", selection: $viewModel.selectedDistanceId) {
+                Text("calculator.distance.no.selection").tag(nil as PersistentIdentifier?)
                 Divider()
                 
                 let trackDistances = distances.filter { $0.raceType == .track }.sorted { $0.distanceKm < $1.distanceKm }
                 if !trackDistances.isEmpty {
-                    Section("トラック") {
+                    Section("calculator.track.section") {
                         ForEach(trackDistances, id: \.persistentModelID) { d in
-                            Text(d.name).tag(d.persistentModelID as PersistentIdentifier?)
+                            Text(d.localizedName).tag(d.persistentModelID as PersistentIdentifier?)
                         }
                     }
                 }
-                
+
                 let roadDistances = distances.filter { $0.raceType == .road }.sorted { $0.distanceKm < $1.distanceKm }
                 if !roadDistances.isEmpty {
-                    Section("ロード") {
+                    Section("calculator.road.section") {
                         ForEach(roadDistances, id: \.persistentModelID) { d in
-                            Text(d.name).tag(d.persistentModelID as PersistentIdentifier?)
+                            Text(d.localizedName).tag(d.persistentModelID as PersistentIdentifier?)
                         }
                     }
                 }
-                
+
                 let otherDistances = distances.filter { $0.raceType == .other }.sorted { $0.distanceKm < $1.distanceKm }
                 if !otherDistances.isEmpty {
-                    Section("その他") {
+                    Section("calculator.other.section") {
                         ForEach(otherDistances, id: \.persistentModelID) { d in
-                            Text(d.name).tag(d.persistentModelID as PersistentIdentifier?)
+                            Text(d.localizedName).tag(d.persistentModelID as PersistentIdentifier?)
                         }
                     }
                 }
@@ -138,7 +139,7 @@ struct PaceCalculatorView: View {
     
     private var distanceInputPart: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("距離を入力")
+            Text("calculator.distance.input")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {
@@ -152,7 +153,7 @@ struct PaceCalculatorView: View {
     }
     
     private var timeSection: some View {
-        Section("時間") {
+        Section("calculator.time.section") {
             TimeInputFields(
                 hoursText: $viewModel.hoursText,
                 minutesText: $viewModel.minutesText,
@@ -166,7 +167,7 @@ struct PaceCalculatorView: View {
     }
     
     private var paceSection: some View {
-        Section("ペース (/km)") {
+        Section("calculator.pace.section") {
             TimeInputFields(
                 hoursText: .constant(""),
                 minutesText: $viewModel.paceMinutesText,
@@ -192,7 +193,7 @@ struct PaceCalculatorView: View {
             }) {
                 HStack {
                     Spacer()
-                    Text("計算")
+                    Text("calculator.calculate")
                         .font(.headline)
                         .foregroundStyle(.white)
                     Spacer()
@@ -209,7 +210,7 @@ struct PaceCalculatorView: View {
         Group {
             if !viewModel.resultText.isEmpty {
                 VStack(spacing: 12) {
-                    Text("計算結果")
+                    Text("calculator.result.section")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -242,10 +243,69 @@ struct PaceCalculatorView: View {
         }
     }
     
+    private var treadmillSection: some View {
+        Section("treadmill.section.title") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("treadmill.speed.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    AccessoryTextField(text: $viewModel.treadmillSpeedText, placeholder: "10.0", keyboardType: .decimalPad, isFirstResponder: nil, showAccessory: true)
+                    Text("km/h")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let pace = viewModel.treadmillPaceResult {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(pace)
+                                .font(.headline)
+                                .foregroundStyle(.blue)
+                                .monospacedDigit()
+                            Text("/km")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("treadmill.pace.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    AccessoryTextField(text: $viewModel.treadmillPaceMinutesText, placeholder: "5", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: true)
+                        .multilineTextAlignment(.center)
+                    Text(":")
+                        .foregroundStyle(.secondary)
+                    AccessoryTextField(text: $viewModel.treadmillPaceSecondsText, placeholder: "30", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: true)
+                        .multilineTextAlignment(.center)
+                    Text("/km")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let speed = viewModel.treadmillSpeedResult {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(speed)
+                                .font(.headline)
+                                .foregroundStyle(.blue)
+                                .monospacedDigit()
+                            Text("km/h")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var lapPresetSection: some View {
         Group {
             if !viewModel.autoLaps.isEmpty || !viewModel.lapPreset.isEmpty {
-                Section("ラップ距離プリセット") {
+                Section("calculator.laps.section") {
                     presetPickerPart
                     if viewModel.lapPreset == "custom" {
                         customLapInputPart
@@ -260,7 +320,7 @@ struct PaceCalculatorView: View {
     
     private var presetPickerPart: some View {
         let availablePresets = viewModel.availableLapPresets()
-        return Picker("ラップ距離", selection: $viewModel.lapPreset) {
+        return Picker("calculator.laps.distance.picker", selection: $viewModel.lapPreset) {
             ForEach(availablePresets, id: \.self) { preset in
                 Text(preset).tag(preset)
             }
@@ -275,7 +335,7 @@ struct PaceCalculatorView: View {
         HStack {
             AccessoryTextField(text: $viewModel.customLapText, placeholder: "例: 400", keyboardType: .decimalPad, isFirstResponder: nil, showAccessory: true)
                 .submitLabel(.done)
-            Picker("単位", selection: $viewModel.customLapUnit) {
+            Picker("calculator.unit.picker", selection: $viewModel.customLapUnit) {
                 Text("m").tag("m")
                 Text("km").tag("km")
             }
@@ -293,10 +353,10 @@ struct PaceCalculatorView: View {
     private var lapListPart: some View {
         Group {
             HStack {
-                Text("自動生成ラップ一覧")
+                Text("calculator.laps.auto.label")
                     .font(.headline)
                 Spacer()
-                Text("\(viewModel.autoLaps.count)区間")
+                Text("lap.count \(viewModel.autoLaps.count)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -340,7 +400,7 @@ struct PaceCalculatorView: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text("Lap \(index+1): \(distanceText)")
-                    Text("累積: \(TimeFormatter.formatTimeWithFraction(cumulative))")
+                    Text(String(localized: "calculator.mode.time") + ": \(TimeFormatter.formatTimeWithFraction(cumulative))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

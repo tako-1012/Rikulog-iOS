@@ -50,14 +50,14 @@ struct SingleRaceShareCard: View {
                 VStack(spacing: 12) { // 20 -> 12 に縮小
                     // 距離・種目バッジ
                     HStack(spacing: 8) {
-                        Text(formatDistance(race.totalDistance))
+                        Text(race.raceType == .field ? race.raceType.displayName : formatDistance(race.totalDistance))
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 4)
-                            .background(Color.blue.opacity(0.12))
-                            .foregroundStyle(.blue)
+                            .background(race.raceType == .field ? Color.green.opacity(0.12) : Color.blue.opacity(0.12))
+                            .foregroundStyle(race.raceType == .field ? Color.green : Color.blue)
                             .cornerRadius(8)
-                        
+
                         Text(race.raceType.displayName)
                             .font(.system(size: 13, weight: .semibold))
                             .padding(.horizontal, 12)
@@ -65,8 +65,19 @@ struct SingleRaceShareCard: View {
                             .background(Color(.secondarySystemBackground))
                             .foregroundStyle(.secondary)
                             .cornerRadius(8)
+
+                        // 追い風参考バッジ
+                        if race.isWindAided == true {
+                            Text("race.wind.aided.badge")
+                                .font(.system(size: 11, weight: .bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.orange.opacity(0.15))
+                                .foregroundStyle(.orange)
+                                .cornerRadius(8)
+                        }
                     }
-                    
+
                     // レース名
                     if showRaceName {
                         Text(race.raceName)
@@ -77,16 +88,27 @@ struct SingleRaceShareCard: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 20)
                     }
-                    
-                    // タイム（ヒーロー表示）
+
+                    // タイム or フィールド記録（ヒーロー表示）
                     if showTime {
-                        Text(TimeFormatter.formatTime(race.totalTime, for: race.raceType))
-                            .font(.system(size: 68, weight: .black, design: .monospaced))
-                            .italic()
-                            .foregroundStyle(.primary)
-                            .minimumScaleFactor(0.4)
-                            .lineLimit(1)
-                            .padding(.horizontal, 20)
+                        if race.raceType == .field {
+                            let fieldVal = race.fieldHeight ?? race.fieldDistance ?? 0
+                            Text(formatFieldRecord(fieldVal))
+                                .font(.system(size: 68, weight: .black, design: .monospaced))
+                                .italic()
+                                .foregroundStyle(.green)
+                                .minimumScaleFactor(0.4)
+                                .lineLimit(1)
+                                .padding(.horizontal, 20)
+                        } else {
+                            Text(TimeFormatter.formatTime(race.totalTime, for: race.raceType))
+                                .font(.system(size: 68, weight: .black, design: .monospaced))
+                                .italic()
+                                .foregroundStyle(.primary)
+                                .minimumScaleFactor(0.4)
+                                .lineLimit(1)
+                                .padding(.horizontal, 20)
+                        }
                     }
                     
                     // 日付・順位バッジ
@@ -107,7 +129,7 @@ struct SingleRaceShareCard: View {
                         if showRank, let ranking = race.ranking {
                             HStack(spacing: 4) {
                                 Image(systemName: "trophy.fill")
-                                Text("\(ranking)位")
+                                Text(ordinalString(for: ranking))
                             }
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(.white)
@@ -144,7 +166,7 @@ struct SingleRaceShareCard: View {
                 
                 // フッター
                 HStack {
-                    Text("陸ログ")
+                    Text("app.name")
                         .font(.system(size: 13, weight: .black))
                         .foregroundStyle(.blue)
                     Spacer()

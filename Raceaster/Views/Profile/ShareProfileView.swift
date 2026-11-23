@@ -76,9 +76,9 @@ struct ShareProfileView: View {
         var id: String { rawValue }
         var displayName: String {
             switch self {
-            case .standard: return "標準"
-            case .square: return "正方形"
-            case .story: return "ストーリー"
+            case .standard: return String(localized: "share.card.standard.short")
+            case .square: return String(localized: "share.card.square.short")
+            case .story: return String(localized: "share.card.story.short")
             }
         }
         func size(baseWidth: CGFloat) -> CGSize {
@@ -126,8 +126,8 @@ struct ShareProfileView: View {
                 .background(Color(uiColor: .systemGroupedBackground))
 
                 List {
-                    Section("タイトル・モード設定") {
-                        Picker("モード", selection: $selectedTitleMode) {
+                    Section("share.title.mode.section") {
+                        Picker("share.mode.picker", selection: $selectedTitleMode) {
                             ForEach(TitleMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                         }
                         .pickerStyle(.segmented)
@@ -138,21 +138,21 @@ struct ShareProfileView: View {
 
                         if selectedTitleMode == .sb {
                             let years = Array(Set(allRecords.map { fiscalYear(for: $0.date) })).sorted(by: >)
-                            Picker("対象年度", selection: $selectedYear) {
-                                ForEach(years, id: \.self) { Text("\(String($0))年度").tag($0) }
+                            Picker("share.year.picker", selection: $selectedYear) {
+                                ForEach(years, id: \.self) { Text("share.year.format \($0)").tag($0) }
                             }
                         }
                         if selectedTitleMode == .custom {
-                            TextField("タイトルを入力", text: $customTitle)
+                            TextField("share.custom.title.placeholder", text: $customTitle)
                                 .focused($isTitleFocused)
                                 .submitLabel(.done) // ✅ キーボードに完了を表示
                         }
                     }
 
-                    Section("表示オプション") {
-                        Toggle("日付を表示する", isOn: $showDateOnCard)
+                    Section("share.display.options") {
+                        Toggle("share.show.date.toggle", isOn: $showDateOnCard)
 
-                        Picker("カード比率", selection: $selectedCardRatio) {
+                        Picker("share.card.ratio", selection: $selectedCardRatio) {
                             ForEach(CardRatio.allCases) { ratio in
                                 Text(ratio.displayName).tag(ratio)
                             }
@@ -167,13 +167,13 @@ struct ShareProfileView: View {
                     }
 
                     if !trackRecords.isEmpty {
-                        Section("トラック種目 (BEST)") { ForEach(trackRecords) { recordRow($0) } }
+                        Section("share.track.section") { ForEach(trackRecords) { recordRow($0) } }
                     }
                     if !roadRecords.isEmpty {
-                        Section("ロード種目 (BEST)") { ForEach(roadRecords) { recordRow($0) } }
+                        Section("share.road.section") { ForEach(roadRecords) { recordRow($0) } }
                     }
                     if !otherRecords.isEmpty {
-                        Section("その他種目 (BEST)") { ForEach(otherRecords) { recordRow($0) } }
+                        Section("share.other.section") { ForEach(otherRecords) { recordRow($0) } }
                     }
                 }
                 
@@ -182,7 +182,7 @@ struct ShareProfileView: View {
                     Button(action: { showingShareSheet = true }) {
                         HStack {
                             Image(systemName: "square.and.arrow.up")
-                            Text("共有する")
+                            Text("share.action.share")
                         }
                         .font(.headline)
                         .foregroundStyle(.white)
@@ -197,7 +197,7 @@ struct ShareProfileView: View {
                     Button(action: saveToPhotos) {
                         HStack {
                             Image(systemName: "square.and.arrow.down")
-                            Text("画像を保存")
+                            Text("share.action.save")
                         }
                         .font(.headline)
                         .foregroundStyle(.blue)
@@ -213,18 +213,18 @@ struct ShareProfileView: View {
                 .background(Color(uiColor: .systemBackground))
                 .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: -4)
             }
-            .navigationTitle("共有画像の作成").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("share.title").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("閉じる") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("common.close") { dismiss() } }
                 // ツールバーのアイコンボタンは削除（下部に移動したため）
                 // ✅ キーボードを閉じるボタン（ツールバー上にも配置）
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("完了") { isTitleFocused = false }
+                    Button("common.done") { isTitleFocused = false }
                 }
             }
             .sheet(isPresented: $showingShareSheet) { ActivityView(activityItems: [generateUIImage()]) }
-            .alert("保存完了", isPresented: $showSaveAlert) { Button("OK", role: .cancel) { } } message: { Text("写真ライブラリに保存しました。") }
+            .alert("share.save.success", isPresented: $showSaveAlert) { Button("common.ok", role: .cancel) { } } message: { Text("share.save.message") }
         }
     }
 

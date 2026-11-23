@@ -31,8 +31,8 @@ final class AccessoryTextField_Internal: UITextField {
 
         let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
         // ✅ 修正：明示的な「完了」タイトルを表示し、iOSの警告に配慮しつつ完了ボタンを復活
-        let doneButton = UIBarButtonItem(title: "完了", style: .plain, target: self, action: #selector(doneButtonTapped))
-        doneButton.accessibilityLabel = "完了"
+        let doneButton = UIBarButtonItem(title: String(localized: "keyboard.done"), style: .plain, target: self, action: #selector(doneButtonTapped))
+        doneButton.accessibilityLabel = String(localized: "keyboard.done")
 
         toolbar.items = [flexSpace, doneButton]
         self.toolbar = toolbar

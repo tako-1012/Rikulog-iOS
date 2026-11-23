@@ -23,7 +23,29 @@ class PaceCalculatorViewModel: ObservableObject {
     @Published var computedPaceSecondsPerKm: Double? = nil
     @Published var selectedRaceType: RaceType? = nil
     @Published var selectedDistanceName: String? = nil
-    
+
+    // Treadmill converter
+    @Published var treadmillSpeedText: String = ""
+    @Published var treadmillPaceMinutesText: String = ""
+    @Published var treadmillPaceSecondsText: String = ""
+
+    var treadmillPaceResult: String? {
+        guard let speed = Double(treadmillSpeedText), speed > 0 else { return nil }
+        let paceSeconds = 3600.0 / speed
+        let mins = Int(paceSeconds) / 60
+        let secs = Int(paceSeconds) % 60
+        return String(format: "%d:%02d", mins, secs)
+    }
+
+    var treadmillSpeedResult: String? {
+        let mins = Double(treadmillPaceMinutesText) ?? 0
+        let secs = Double(treadmillPaceSecondsText) ?? 0
+        let totalSeconds = mins * 60.0 + secs
+        guard totalSeconds > 0 else { return nil }
+        let speed = 3600.0 / totalSeconds
+        return String(format: "%.1f", speed)
+    }
+
     enum CalculationMode {
         case calculatePace
         case calculateTime
@@ -48,11 +70,11 @@ class PaceCalculatorViewModel: ObservableObject {
     /// ペースを計算
     func calculatePace() {
         guard let dist = Double(distance), dist > 0 else {
-            resultText = "有効な距離を入力してください"
+            resultText = String(localized: "calc.error.invalid.distance")
             return
         }
         guard dist <= 1000 else {
-            resultText = "距離が範囲外です（1000km以下）"
+            resultText = String(localized: "calc.error.distance.range")
             return
         }
         let h = Int(hoursText) ?? 0
@@ -60,12 +82,12 @@ class PaceCalculatorViewModel: ObservableObject {
         let s = Double(secondsText) ?? 0.0
         let totalSeconds = Double(h * 3600 + m * 60) + s
         guard totalSeconds > 0 else {
-            resultText = "有効な時間を入力してください"
+            resultText = String(localized: "calc.error.invalid.time")
             return
         }
         let pacePerKm = totalSeconds / dist
         let paceFormatted = TimeFormatter.formatTimeWithFraction(pacePerKm)
-        resultText = "ペース: \(paceFormatted) /km"
+        resultText = String(format: String(localized: "calc.result.pace.format"), paceFormatted)
         computedPaceSecondsPerKm = pacePerKm
         adjustLapPreset(raceType: selectedRaceType, distanceKm: dist)
         updateAutoLaps(totalDistanceKm: dist)
@@ -74,13 +96,13 @@ class PaceCalculatorViewModel: ObservableObject {
     /// 時間を計算
     func calculateTime() {
         guard let dist = Double(distance), dist > 0 else {
-            resultText = "有効な距離を入力してください"
+            resultText = String(localized: "calc.error.invalid.distance")
             autoLaps = []
             computedPaceSecondsPerKm = nil
             return
         }
         guard dist <= 1000 else {
-            resultText = "距離が範囲外です（1000km以下）"
+            resultText = String(localized: "calc.error.distance.range")
             autoLaps = []
             computedPaceSecondsPerKm = nil
             return
@@ -90,13 +112,13 @@ class PaceCalculatorViewModel: ObservableObject {
         let paceSecondsPerKm = Double(paceMin * 60) + paceSec
         computedPaceSecondsPerKm = paceSecondsPerKm
         guard paceSecondsPerKm > 0 else {
-            resultText = "有効なペースを入力してください"
+            resultText = String(localized: "calc.error.invalid.pace")
             autoLaps = []
             return
         }
         let totalSeconds = paceSecondsPerKm * dist
         let timeString = TimeFormatter.formatTimeWithFraction(totalSeconds)
-        resultText = "タイム: \(timeString)"
+        resultText = String(format: String(localized: "calc.result.time.format"), timeString)
         adjustLapPreset(raceType: selectedRaceType, distanceKm: dist)
         updateAutoLaps(totalDistanceKm: dist)
     }
@@ -108,7 +130,7 @@ class PaceCalculatorViewModel: ObservableObject {
         let s = Double(secondsText) ?? 0.0
         let totalSeconds = Double(h * 3600 + m * 60) + s
         guard totalSeconds > 0 else {
-            resultText = "有効な時間を入力してください"
+            resultText = String(localized: "calc.error.invalid.time")
             autoLaps = []
             computedPaceSecondsPerKm = nil
             return
@@ -118,17 +140,17 @@ class PaceCalculatorViewModel: ObservableObject {
         let paceSecondsPerKm = Double(paceMin * 60) + paceSec
         computedPaceSecondsPerKm = paceSecondsPerKm
         guard paceSecondsPerKm > 0 else {
-            resultText = "有効なペースを入力してください"
+            resultText = String(localized: "calc.error.invalid.pace")
             autoLaps = []
             return
         }
         let calculatedDistance = totalSeconds / paceSecondsPerKm
         guard calculatedDistance > 0 && calculatedDistance < 1000 else {
-            resultText = "計算結果が範囲外です"
+            resultText = String(localized: "calc.error.distance.overflow")
             autoLaps = []
             return
         }
-        resultText = String(format: "距離: %.2f km", calculatedDistance)
+        resultText = String(format: String(localized: "calc.result.distance.format"), calculatedDistance)
         adjustLapPreset(raceType: selectedRaceType, distanceKm: calculatedDistance)
         updateAutoLaps(totalDistanceKm: calculatedDistance)
     }
@@ -226,6 +248,8 @@ class PaceCalculatorViewModel: ObservableObject {
                 allowedPresets = ["1km", "5km"]
             case .other:
                 allowedPresets = dist >= 10.0 ? ["1km", "5km"] : ["400m", "1000m"]
+            case .field:
+                allowedPresets = []
             }
         } else {
             allowedPresets = dist >= 10.0 ? ["1km", "5km"] : ["400m", "1000m"]
@@ -249,7 +273,7 @@ class PaceCalculatorViewModel: ObservableObject {
         isApplyingDistanceSelection = true
         selectedDistanceId = distance.persistentModelID
         selectedRaceType = distance.raceType
-        selectedDistanceName = distance.name
+        selectedDistanceName = distance.localizedName
         self.distance = String(format: "%.3f", distance.distanceKm)
         adjustLapPreset(raceType: distance.raceType, distanceKm: distance.distanceKm)
         updateAutoLapsIfNeeded()
@@ -287,6 +311,8 @@ extension PaceCalculatorViewModel {
                 return ["1km", "5km", "custom"]
             case .other:
                 return dist >= 10.0 ? ["1km", "5km", "custom"] : ["400m", "1000m", "custom"]
+            case .field:
+                return []
             }
         }
         return dist >= 10.0 ? ["1km", "5km", "custom"] : ["400m", "1000m", "custom"]

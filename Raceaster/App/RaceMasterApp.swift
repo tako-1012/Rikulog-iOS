@@ -34,15 +34,16 @@ struct RaceMasterApp: App {
         DispatchQueue.main.async {
             #if DEBUG
             print("🔎 AppEntitlements.shouldShowAds = \(AppEntitlements.shared.shouldShowAds)")
-            // Use StoreKitManager as the single source of truth for premium state
             print("🔎 StoreKitManager.isPremium: \(StoreKitManager.shared.isPremium)")
             #endif
         }
 
         // 起動直後に RaceDistance の重複を除去（TabView 描画前に実施）
-        // CloudKit 同期前のローカル状態に対して即時クリーンアップを行い、
-        // 起動直後のPB重複表示を抑制します（後続のView側の二重防御も維持）。
         earlyAutoDedupeRaceDistances()
+
+        // DB初期化・マイグレーション（init()完了後に非同期実行してメインスレッドをブロックしない）
+        let container = sharedModelContainer
+        Task { AppInitializer.run(in: container) }
     }
 
     // ATT リクエスト関数
@@ -165,13 +166,13 @@ struct RaceMasterApp: App {
                         Image(systemName: "stopwatch.fill")
                             .font(.system(size: 60))
                             .foregroundStyle(.blue)
-                        Text("陸ログ")
+                        Text("app.name")
                             .font(.title)
                             .fontWeight(.bold)
                         Spacer()
                         ProgressView()
                             .scaleEffect(1.2)
-                        Text("起動中...")
+                        Text("app.loading")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()

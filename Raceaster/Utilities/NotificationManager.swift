@@ -12,9 +12,9 @@ enum NotificationFrequency: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .none: return "なし"
-        case .weekly: return "毎週末"
-        case .monthly: return "毎月末"
+        case .none: return String(localized: "notification.none.display")
+        case .weekly: return String(localized: "notification.weekly.display")
+        case .monthly: return String(localized: "notification.monthly.display")
         }
     }
 }
@@ -65,8 +65,8 @@ final class NotificationManager {
     /// 毎週末（日曜 20:00）の通知をスケジュール
     private func scheduleWeeklyReminders() {
         let content = UNMutableNotificationContent()
-        content.title = "今週もお疲れ様でした！"
-        content.body = "今週のレース結果は登録しましたか？記録を振り返ってみましょう。"
+        content.title = String(localized: "notification.weekly.title")
+        content.body = String(localized: "notification.weekly.body")
         content.sound = .default
         
         // 毎週日曜日の20:00に通知
@@ -88,17 +88,20 @@ final class NotificationManager {
     /// 毎月末（末日 20:00）の通知をスケジュール
     private func scheduleMonthlyReminders() {
         // 今後3ヶ月分の月末通知を登録
+        // 月末当日に関数が呼ばれた場合、当日 20:00 が既に過去になっていることがあるため
+        // targetDate > Date() でスキップし、iOS が黙って無視するのを防ぐ
         for offset in 0...2 {
-            guard let date = calendar.date(byAdding: .month, value: offset, to: Date()) else { continue }
-            guard let targetDate = lastDayOfMonth(for: date) else { continue }
+            guard let date = calendar.date(byAdding: .month, value: offset, to: Date()),
+                  let targetDate = lastDayOfMonth(for: date),
+                  targetDate > Date() else { continue }
             scheduleMonthlyReminder(for: targetDate)
         }
     }
     
     private func scheduleMonthlyReminder(for date: Date) {
         let content = UNMutableNotificationContent()
-        content.title = "今月もお疲れ様でした！"
-        content.body = "今月のレース結果は登録しましたか？"
+        content.title = String(localized: "notification.monthly.title")
+        content.body = String(localized: "notification.monthly.body")
         content.sound = .default
         
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)

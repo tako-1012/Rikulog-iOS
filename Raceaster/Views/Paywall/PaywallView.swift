@@ -58,8 +58,8 @@ struct PaywallView: View {
                     }
                 }
             }
-            .alert("購入", isPresented: $showAlert) {
-                Button("OK") { }
+            .alert("paywall.purchase.alert.title", isPresented: $showAlert) {
+                Button("common.ok") { }
             } message: {
                 Text(alertMessage)
             }
@@ -94,7 +94,7 @@ struct PaywallView: View {
                 Text("Premium Plan")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                 
-                Text("一度の購入で、すべての機能を無制限に。")
+                Text("paywall.header.subtitle")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -109,8 +109,8 @@ struct PaywallView: View {
             featureRow(
                 icon: "infinity.circle.fill",
                 iconColor: .blue,
-                title: "無制限の保存",
-                description: "レース記録を無制限に保存できます"
+                title: "paywall.feature.unlimited.title",
+                description: "paywall.feature.unlimited.desc"
             )
             
             Divider()
@@ -119,8 +119,8 @@ struct PaywallView: View {
             featureRow(
                 icon: "eye.slash.fill",
                 iconColor: .purple,
-                title: "広告なし",
-                description: "すべての広告を非表示にします"
+                title: "paywall.feature.noad.title",
+                description: "paywall.feature.noad.desc"
             )
             
             Divider()
@@ -129,8 +129,8 @@ struct PaywallView: View {
             featureRow(
                 icon: "star.fill",
                 iconColor: .orange,
-                title: "すべての機能",
-                description: "今後追加される機能もすべて利用可能"
+                title: "paywall.feature.all.title",
+                description: "paywall.feature.all.desc"
             )
         }
         .padding(24)
@@ -165,7 +165,7 @@ struct PaywallView: View {
                     Task { await purchaseProduct(product) }
                 } label: {
                     HStack {
-                        Text("¥500で購入")
+                        Text("paywall.purchase.button \(product.displayPrice)")
                             .font(.headline)
                             .fontWeight(.semibold)
                         
@@ -193,7 +193,7 @@ struct PaywallView: View {
                 .disabled(isPurchasing)
             }
             
-            Text("買い切り型で、追加料金は一切かかりません")
+            Text("paywall.price.note")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -207,7 +207,7 @@ struct PaywallView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.green)
             
-            Text("すでにプレミアム会員です")
+            Text("paywall.already.premium")
                 .font(.headline)
                 .foregroundColor(.green)
         }
@@ -224,15 +224,15 @@ struct PaywallView: View {
                     isPurchasing = false
                     
                     if store.isPremium {
-                        alertMessage = "購入を復元しました"
+                        alertMessage = String(localized: "paywall.purchase.restored")
                         showAlert = true
                     } else {
-                        alertMessage = "復元可能な購入が見つかりませんでした"
+                        alertMessage = String(localized: "paywall.purchase.not.found")
                         showAlert = true
                     }
                 }
             } label: {
-                Text("購入を復元")
+                Text("paywall.restore")
                     .font(.subheadline)
                     .foregroundColor(.blue)
             }
@@ -244,8 +244,8 @@ struct PaywallView: View {
     
     private var policyLinks: some View {
         HStack(spacing: 20) {
-            Link("利用規約", destination: URL(string: "https://tako-1012.github.io/riku-log_policies/terms.html")!)
-            Link("プライバシーポリシー", destination: URL(string: "https://tako-1012.github.io/riku-log_policies/privacy-policy.html")!)
+            Link(String(localized: "paywall.terms"), destination: URL(string: "https://tako-1012.github.io/riku-log_policies/terms.html")!)
+            Link(String(localized: "paywall.privacy"), destination: URL(string: "https://tako-1012.github.io/riku-log_policies/privacy-policy.html")!)
         }
         .font(.caption)
         .foregroundColor(.secondary)
@@ -260,7 +260,7 @@ struct PaywallView: View {
         do {
             let transaction = try await store.purchase(product)
             if transaction != nil {
-                alertMessage = "購入が完了しました！"
+                alertMessage = String(localized: "paywall.purchase.completed")
                 showAlert = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) { dismiss() }
             }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LapListSection: View {
-    @Binding var laps: [LapData]
+    @Binding var laps: [LapInput]
     let raceType: RaceType
     var onEdit: (Int) -> Void
 
@@ -20,7 +20,7 @@ struct LapListSection: View {
                     Button(role: .destructive) {
                         laps.remove(at: index)
                     } label: {
-                        Label("削除", systemImage: "trash")
+                        Label("common.delete", systemImage: "trash")
                     }
                 }
             }
@@ -28,23 +28,23 @@ struct LapListSection: View {
             Button {
                 onEdit(-1)
             } label: {
-                Label("ラップを編集", systemImage: "pencil.circle.fill")
+                Label("lap.edit", systemImage: "pencil.circle.fill")
             }
 
             if !laps.isEmpty {
                 let totalLapTime = laps.reduce(0.0) { $0 + $1.time }
                 HStack {
                     Spacer()
-                    Text("ラップ合計タイム: " + TimeFormatter.formatTimeWithFraction(totalLapTime))
+                    Text(String(localized: "lap.section.header") + ": " + TimeFormatter.formatTimeWithFraction(totalLapTime))
                         .font(.headline)
                         .foregroundStyle(.blue)
                     Spacer()
                 }
             }
         } header: {
-            Text("ラップタイム")
+            Text("lap.section.header")
         } footer: {
-            Text("各区間のラップタイムを記録できます")
+            Text("lap.section.footer")
         }
     }
 }

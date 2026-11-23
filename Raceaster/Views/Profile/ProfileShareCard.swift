@@ -24,7 +24,7 @@ struct ProfileShareCard: View {
                 Divider()
                 VStack(spacing: 12) {
                     if records.isEmpty {
-                        Text("記録を選択してください").font(.system(size: 14)).foregroundColor(.secondary).frame(maxWidth: .infinity, minHeight: 100)
+                        Text("share.profile.select").font(.system(size: 14)).foregroundColor(.secondary).frame(maxWidth: .infinity, minHeight: 100)
                     } else {
                         ForEach(records) { record in
                             HStack {
@@ -40,7 +40,7 @@ struct ProfileShareCard: View {
                 }
                 Spacer()
                 HStack {
-                    Text("陸ログ").font(.system(size: 12, weight: .bold)).foregroundColor(.blue)
+                    Text("app.name").font(.system(size: 12, weight: .bold)).foregroundColor(.blue)
                     Spacer()
                     Text("RECORDED BY APP").font(.system(size: 8)).foregroundColor(.secondary).kerning(1)
                 }

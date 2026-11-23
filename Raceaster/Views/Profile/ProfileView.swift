@@ -21,9 +21,13 @@ struct ProfileView: View {
     
     @State private var showingEditProfile = false
     @State private var showingShareSheet = false
-    
+
+    // PB表示用キャッシュ（races/distances 変化時に .task で非同期再計算）
+    @State private var pbDistsByType: [RaceType: [RaceDistance]] = [:]
+    @State private var pbFieldDists: [RaceDistance] = []
+
     private var userProfile: UserProfile { userProfiles.first ?? UserProfile() }
-    
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -33,10 +37,10 @@ struct ProfileView: View {
                     VDOTAverageSection(races: races, userProfile: userProfile)
                     personalBestSection
                     shareCardBannerSection
-                    Section("シーズンベスト") { SeasonBestListView() }
+                    Section("profile.season.best.section") { SeasonBestListView() }
                 }
             }
-            .navigationTitle("プロフィール")
+            .navigationTitle("profile.title")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { showingShareSheet = true }) { Image(systemName: "square.and.arrow.up") }
@@ -51,40 +55,46 @@ struct ProfileView: View {
                 )
             }
             .sheet(isPresented: $showingEditProfile) { EditProfileView(profile: userProfile) }
+            // races または distances が変わったときだけ PB を再計算する
+            // ビュー再描画ではなく、データ変化時のみ実行してメインスレッド負荷を抑える
+            .task(id: "\(races.count)-\(distances.count)") {
+                await MainActor.run { computePBDistances() }
+            }
         }
-        .onAppear { }
     }
 
-    // ✅ PBセクション：RaceDistanceの数値(distanceKm)を直接参照してソート
-    private var personalBestSection: some View {
-        Section("パーソナルベスト") {
-            ForEach([RaceType.track, RaceType.road, RaceType.other], id: \.self) { type in
-                let validDists = uniqueDistances(
-                    distances.filter { d in
-                        d.raceType == type && races.contains { r in d.matches(distance: r.totalDistance) && r.raceType == d.raceType }
-                    }
-                ).sorted { $0.distanceKm < $1.distanceKm }
+    /// PB表示に使う種目リストを計算してキャッシュに格納
+    private func computePBDistances() {
+        for type in [RaceType.track, RaceType.road, RaceType.other] {
+            pbDistsByType[type] = distances.filter { d in
+                d.raceType == type &&
+                races.contains { r in d.matches(distance: r.totalDistance) && r.raceType == d.raceType }
+            }.unique().sorted { $0.distanceKm < $1.distanceKm }
+        }
+        pbFieldDists = distances.filter { d in
+            d.raceType == .field &&
+            races.contains { r in d.matches(distance: r.totalDistance) && r.raceType == .field }
+        }.unique().sorted { $0.sortOrder < $1.sortOrder }
+    }
 
+    // ✅ PBセクション：キャッシュ済みリストを使用して描画負荷を排除
+    private var personalBestSection: some View {
+        Section("profile.pb.section") {
+            // 走種目（タイム比較）
+            ForEach([RaceType.track, RaceType.road, RaceType.other], id: \.self) { type in
+                let validDists = pbDistsByType[type] ?? []
                 if !validDists.isEmpty {
                     Text(type.displayName).font(.subheadline).bold().padding(.top, 6)
                     ForEach(validDists) { d in PersonalBestRow(distanceModel: d, races: races, distances: distances) }
                 }
             }
-        }
-    }
 
-    /// 距離重複を距離kmと種目でユニーク化
-    private func uniqueDistances(_ items: [RaceDistance]) -> [RaceDistance] {
-        var seen: Set<String> = []
-        var result: [RaceDistance] = []
-        for d in items {
-            let key = "\(d.raceType.rawValue)-\(String(format: "%.6f", d.distanceKm))"
-            if !seen.contains(key) {
-                seen.insert(key)
-                result.append(d)
+            // フィールド種目（記録比較：大きい方が優秀）
+            if !pbFieldDists.isEmpty {
+                Text(RaceType.field.displayName).font(.subheadline).bold().padding(.top, 6)
+                ForEach(pbFieldDists) { d in FieldPersonalBestRow(distanceModel: d, races: races) }
             }
         }
-        return result
     }
 
     // ✅ モデルの生の数値を ShareRecordItem に引き継ぐ
@@ -93,7 +103,7 @@ struct ProfileView: View {
             let matchedDistance = distances.first { d in 
                 d.matches(distance: r.totalDistance) && d.raceType == r.raceType 
             }
-            let name = matchedDistance?.name ?? "\(r.totalDistance)km"
+            let name = matchedDistance?.localizedName ?? "\(r.totalDistance)km"
             return ShareRecordItem(
                 distanceName: name,
                 timeString: TimeFormatter.formatTime(r.totalTime, for: r.raceType),
@@ -114,7 +124,7 @@ struct ProfileView: View {
                 }
                 HStack(spacing: 12) {
                     Button(action: { showingEditProfile = true }) {
-                        Label("プロフィール編集", systemImage: "pencil")
+                        Label("profile.edit", systemImage: "pencil")
                             .font(.callout.bold())
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -126,7 +136,7 @@ struct ProfileView: View {
                     }.buttonStyle(.plain)
                     
                     Button(action: { showingShareSheet = true }) {
-                        Label("記録をシェア", systemImage: "square.and.arrow.up")
+                        Label("profile.share.records", systemImage: "square.and.arrow.up")
                             .font(.callout.bold())
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -143,11 +153,11 @@ struct ProfileView: View {
     }
 
     private var statusSection: some View {
-        Section("ステータス") {
+        Section("profile.status.section") {
             HStack {
-                VStack(alignment: .leading) { Text("総記録数").font(.caption).foregroundStyle(.secondary); Text("\(races.count)").font(.title2).bold().foregroundStyle(.green) }.frame(maxWidth: .infinity)
+                VStack(alignment: .leading) { Text("profile.status.total.records").font(.caption).foregroundStyle(.secondary); Text("\(races.count)").font(.title2).bold().foregroundStyle(.green) }.frame(maxWidth: .infinity)
                 Divider().frame(height: 40)
-                VStack(alignment: .leading) { Text("登録種目数").font(.caption).foregroundStyle(.secondary); Text("\(distances.count)").font(.title2).bold().foregroundStyle(.blue) }.frame(maxWidth: .infinity)
+                VStack(alignment: .leading) { Text("profile.status.total.events").font(.caption).foregroundStyle(.secondary); Text("\(distances.count)").font(.title2).bold().foregroundStyle(.blue) }.frame(maxWidth: .infinity)
             }
         }
     }
@@ -169,10 +179,10 @@ struct ProfileView: View {
                         )
                         .cornerRadius(10)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("共有カードを作成")
+                        Text("profile.share.card")
                             .font(.headline)
                             .foregroundStyle(.primary)
-                        Text("自己ベストをSNSでシェアしよう")
+                        Text("profile.share.sns")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -188,13 +198,54 @@ struct ProfileView: View {
     }
 }
 
+/// フィールド種目のPB行（記録が大きい方が優秀）
+struct FieldPersonalBestRow: View {
+    let distanceModel: RaceDistance
+    let races: [RaceRecord]
+
+    private var fieldRaces: [RaceRecord] {
+        races.filter {
+            distanceModel.matches(distance: $0.totalDistance) && $0.raceType == .field
+        }
+    }
+
+    private var pbRace: RaceRecord? {
+        if distanceModel.isHeightEvent {
+            return fieldRaces.max { ($0.fieldHeight ?? 0) < ($1.fieldHeight ?? 0) }
+        } else {
+            return fieldRaces.max { ($0.fieldDistance ?? 0) < ($1.fieldDistance ?? 0) }
+        }
+    }
+
+    var body: some View {
+        if let pb = pbRace {
+            let recordValue = pb.fieldHeight ?? pb.fieldDistance ?? 0
+            NavigationLink(destination: RaceDetailView(race: pb)) {
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(distanceModel.localizedName).font(.headline)
+                        Text(pb.raceName).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing) {
+                        Text(formatFieldRecord(recordValue))
+                            .font(.title3).bold().foregroundStyle(.green)
+                        Text(pb.date.formatted(date: .numeric, time: .omitted))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }.buttonStyle(.plain)
+        }
+    }
+}
+
 struct PersonalBestRow: View {
     let distanceModel: RaceDistance; let races: [RaceRecord]; let distances: [RaceDistance]
     var body: some View {
         if let pb = races.filter({ distanceModel.matches(distance: $0.totalDistance) && $0.raceType == distanceModel.raceType }).min(by: { $0.totalTime < $1.totalTime }) {
             NavigationLink(destination: RaceDetailView(race: pb)) {
                 HStack {
-                    VStack(alignment: .leading) { Text(distanceModel.name).font(.headline); Text(pb.raceName).font(.caption).foregroundStyle(.secondary) }
+                    VStack(alignment: .leading) { Text(distanceModel.localizedName).font(.headline); Text(pb.raceName).font(.caption).foregroundStyle(.secondary) }
                     Spacer()
                         VStack(alignment: .trailing) { 
                         Text(TimeFormatter.formatTime(pb.totalTime, for: pb.raceType)).font(.title3).bold().foregroundStyle(.blue)
@@ -211,20 +262,20 @@ struct VDOTAverageSection: View {
     @State private var selectedPeriod: Int = 90
     @State private var showTrainingPaces: Bool = false
     var body: some View {
-        Section("走力指標") {
-            Picker("期間", selection: $selectedPeriod) { Text("3ヶ月").tag(90); Text("6ヶ月").tag(180); Text("全データ").tag(9999) }.pickerStyle(.segmented)
+        Section("profile.performance.section") {
+            Picker("期間", selection: $selectedPeriod) { Text("profile.period.3months").tag(90); Text("profile.period.6months").tag(180); Text("profile.period.all").tag(9999) }.pickerStyle(.segmented)
             // 短距離（400m 以下）を除外して VDOT を計算
             let cutoffDate = selectedPeriod < 9999 ? Calendar.current.date(byAdding: .day, value: -selectedPeriod, to: Date()) ?? Date() : Date.distantPast
             let validRaces = races.filter { $0.includeInVDOT && $0.totalDistance >= 0.5 && $0.date >= cutoffDate }
             let vdot = validRaces.isEmpty ? 0 : validRaces.reduce(0.0) { $0 + $1.vdot } / Double(validRaces.count)
             HStack {
-                VStack(alignment: .leading) { Text("平均VDOT").font(.caption).foregroundStyle(.secondary); Text(String(format: "%.1f", vdot)).font(.title).bold().foregroundStyle(.blue) }
+                VStack(alignment: .leading) { Text("profile.performance.vdot").font(.caption).foregroundStyle(.secondary); Text(String(format: "%.1f", vdot)).font(.title).bold().foregroundStyle(.blue) }
                 Spacer()
             }
 
             // トレーニングペース表示
             if vdot > 0 {
-                DisclosureGroup("トレーニングペース", isExpanded: $showTrainingPaces) {
+                DisclosureGroup("profile.performance.paces", isExpanded: $showTrainingPaces) {
                     let paces = VDOTCalculator.allTrainingPaces(vdot: vdot)
                     TrainingPaceRow(label: "Easy (E)", pace: paces[.easy] ?? 0, color: .green)
                     TrainingPaceRow(label: "Marathon (M)", pace: paces[.marathon] ?? 0, color: .teal)
@@ -261,10 +312,10 @@ struct EditProfileView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("基本情報") { TextField("名前", text: $profile.name); TextField("所属", text: $profile.club) }
+                Section("profile.edit.basic.section") { TextField("profile.edit.name", text: $profile.name); TextField("profile.edit.club", text: $profile.club) }
             }
-            .navigationTitle("プロフィール編集").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() } } }
+            .navigationTitle("profile.edit.title").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("common.close") { dismiss() } } }
         }
     }
 }

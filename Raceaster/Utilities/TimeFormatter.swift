@@ -60,6 +60,9 @@ struct TimeFormatter {
         case .track, .other:
             // トラックは小数点まで表示（既存の小数保持を尊重）
             return formatTimeWithFraction(seconds)
+        case .field:
+            // フィールド種目はタイム表示を使用しない
+            return "-"
         }
     }
 

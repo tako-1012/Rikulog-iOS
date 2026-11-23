@@ -13,7 +13,9 @@ final class StoreKitManager: ObservableObject {
     @Published var lifetimeProduct: Product? = nil
     @Published var errorMessage: String? = nil
 
-    private let productIDs: [String] = ["rikulog_premium_lifetime"]
+    private let productIDs: [String] = [
+        "rikulog_premium_lifetime"
+    ]
     private var transactionListenerTask: Task<Void, Never>? = nil
     
     // UserDefaults キー

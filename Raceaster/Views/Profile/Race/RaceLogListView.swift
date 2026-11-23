@@ -26,9 +26,9 @@ struct RaceLogListView: View {
                 
                 if displayedRaces.isEmpty {
                     ContentUnavailableView {
-                        Label("レース記録なし", systemImage: "figure.run.circle")
+                        Label("racelog.empty.title", systemImage: "figure.run.circle")
                     } description: {
-                        Text("初めてのレース記録を追加して\nあなたの走りを記録しましょう！")
+                        Text("racelog.empty.description")
                             .multilineTextAlignment(.center)
                     } actions: {
                         Button(action: {
@@ -38,7 +38,7 @@ struct RaceLogListView: View {
                                 showAddRace = true
                             }
                         }) {
-                            Label("記録を追加", systemImage: "plus.circle.fill")
+                            Label("racelog.add.record", systemImage: "plus.circle.fill")
                         }
                         .buttonStyle(.borderedProminent)
                     }
@@ -46,7 +46,7 @@ struct RaceLogListView: View {
                     List {
                         ForEach(displayedRaces) { race in
                             NavigationLink(destination: RaceDetailView(race: race)) {
-                                RaceRowView(race: race)
+                                RaceRowView(race: race, eventName: eventName(for: race))
                             }
                         }
                         .onDelete { indexSet in
@@ -60,24 +60,24 @@ struct RaceLogListView: View {
                     .listStyle(.insetGrouped)
                 }
             }
-            .searchable(text: $searchText, prompt: "大会名で検索")
-            .navigationTitle("レース記録")
+            .searchable(text: $searchText, prompt: "racelog.search.prompt")
+            .navigationTitle("racelog.title")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
-                        Button("すべて選択") {
+                        Button("common.all") {
                             selectedDistance = nil
                         }
                         Divider()
                         ForEach(distances) { dist in
-                            Button(dist.name) {
+                            Button(dist.localizedName) {
                                 selectedDistance = dist
                             }
                         }
                     } label: {
                         HStack {
                             Image(systemName: "ruler")
-                            Text(selectedDistance?.name ?? "すべて")
+                            Text(selectedDistance?.localizedName ?? String(localized: "racelog.filter.all"))
                         }
                     }
                 }
@@ -92,7 +92,7 @@ struct RaceLogListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .accessibilityLabel("レース記録を追加")
+                    .accessibilityLabel("race.add.title")
                 }
             }
             .sheet(isPresented: $showAddRace) {
@@ -100,22 +100,22 @@ struct RaceLogListView: View {
                     AddRaceView()
                 }
             }
-            .alert("レース登録の上限", isPresented: $showLimitAlert) {
-                Button("キャンセル", role: .cancel) { }
-                Button("Premiumを見る") {
+            .alert("racelog.limit.alert.title", isPresented: $showLimitAlert) {
+                Button("common.cancel", role: .cancel) { }
+                Button("racelog.premium.button") {
                     showPaywall = true
                 }
             } message: {
-                Text("無料版では50件までレースを記録できます。\n\nPremiumにアップグレードすると、無制限にレースを記録できます。")
+                Text("racelog.limit.alert.message")
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
             }
-            .alert("記録を削除", isPresented: $showDeleteAlert, presenting: raceToDelete) { race in
-                Button("キャンセル", role: .cancel) {
+            .alert("racelog.delete.title", isPresented: $showDeleteAlert, presenting: raceToDelete) { race in
+                Button("common.cancel", role: .cancel) {
                     raceToDelete = nil
                 }
-                Button("削除", role: .destructive) {
+                Button("common.delete", role: .destructive) {
                     modelContext.delete(race)
                     do {
                         try modelContext.save()
@@ -125,7 +125,7 @@ struct RaceLogListView: View {
                     raceToDelete = nil
                 }
             } message: { race in
-                Text("\"\(race.raceName)\" の記録を削除しますか？\nこの操作は取り消せません。")
+                Text(String(format: String(localized: "racelog.delete.message %@"), race.raceName))
             }
         }
     }
@@ -138,11 +138,11 @@ struct RaceLogListView: View {
                 .foregroundColor(.orange)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("あと\(remaining)件で上限です")
+                Text("racelog.limit.warning \(remaining)")
                     .font(.subheadline.bold())
 
                 if remaining == 0 {
-                    Text("これ以上登録するにはPremium版が必要です")
+                    Text("racelog.premium.needed")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -151,7 +151,7 @@ struct RaceLogListView: View {
             Spacer()
 
             Button(action: { showPaywall = true }) {
-                Text(remaining == 0 ? "Premium版" : "アップグレード")
+                Text(remaining == 0 ? String(localized: "racelog.premium.limit.button") : String(localized: "racelog.upgrade.button"))
                     .font(.caption.bold())
             }
             .foregroundColor(.blue)
@@ -173,13 +173,30 @@ struct RaceLogListView: View {
         }
         return result
     }
+
+    /// フィールド種目の種目名を返す（走種目は nil）
+    private func eventName(for race: RaceRecord) -> String? {
+        guard race.raceType == .field else { return nil }
+        return distances.first { $0.matches(distance: race.totalDistance) && $0.raceType == .field }?.localizedName
+    }
 }
 
 /// レース記録の行ビュー
 struct RaceRowView: View {
     let race: RaceRecord
+    /// フィールド種目の種目名（RaceLogListView から渡す）
+    var eventName: String? = nil
 
     var body: some View {
+        if race.raceType == .field {
+            fieldRowBody
+        } else {
+            runningRowBody
+        }
+    }
+
+    // MARK: 走種目（既存UI維持）
+    private var runningRowBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: race.raceType.iconName)
@@ -193,7 +210,7 @@ struct RaceRowView: View {
 
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("距離")
+                    Text("race.row.distance")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Text(distanceText)
@@ -205,7 +222,7 @@ struct RaceRowView: View {
                     .frame(height: 30)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("タイム")
+                    Text("race.row.time")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Text(TimeFormatter.formatTime(race.totalTime, for: race.raceType))
@@ -216,7 +233,7 @@ struct RaceRowView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("ペース")
+                    Text("race.row.pace")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Text(TimeFormatter.formatPace(race.averagePace) + "/km")
@@ -226,7 +243,7 @@ struct RaceRowView: View {
             }
 
             HStack {
-                Text(race.date.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits).locale(Locale(identifier: "ja_JP"))))
+                Text(race.date.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -242,7 +259,7 @@ struct RaceRowView: View {
                 }
 
                 if let ranking = race.ranking {
-                    Text("\(ranking)位")
+                    Text(ordinalString(for: ranking))
                         .font(.caption)
                         .monospacedDigit()
                         .padding(.horizontal, 8)
@@ -265,6 +282,92 @@ struct RaceRowView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: フィールド種目
+    private var fieldRowBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: race.raceType.iconName)
+                    .foregroundStyle(.green)
+                    .imageScale(.large)
+                Text(race.raceName)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
+            HStack(spacing: 16) {
+                // 種目名
+                if let name = eventName {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("race.row.event")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(name)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    Divider().frame(height: 30)
+                }
+
+                // 記録
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("race.row.record")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(fieldRecordText)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.green)
+                }
+
+                Spacer()
+
+                // 追い風参考バッジ
+                if race.isWindAided == true {
+                    Text("race.row.wind.aided")
+                        .font(.caption2)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.15))
+                        .foregroundStyle(.orange)
+                        .cornerRadius(6)
+                }
+            }
+
+            HStack {
+                Text(race.date.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if let ranking = race.ranking {
+                    Text(ordinalString(for: ranking))
+                        .font(.caption)
+                        .monospacedDigit()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.15))
+                        .foregroundStyle(.orange)
+                        .cornerRadius(6)
+                }
+
+                if let ws = race.windSpeed {
+                    Text(String(format: String(localized: "race.wind.format"), ws))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var fieldRecordText: String {
+        if let fh = race.fieldHeight { return formatFieldRecord(fh) }
+        if let fd = race.fieldDistance { return formatFieldRecord(fd) }
+        return String(localized: "race.row.no.record")
     }
 
     private var distanceText: String {

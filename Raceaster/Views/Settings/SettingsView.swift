@@ -30,22 +30,22 @@ struct SettingsView: View {
                     // iCloud 同期表示を削除
                     Section {
                         NavigationLink(destination: RaceDistanceManagementView()) {
-                            Label("種目管理", systemImage: "list.number")
+                            Label("settings.events.management", systemImage: "list.number")
                         }
                     } header: {
-                        Text("種目設定")
+                        Text("settings.events.section")
                     } footer: {
-                        Text("登録済み種目: \(distances.count)件")
+                        Text("settings.events.footer \(distances.count)")
                     }
 
-                    Section("アプリ情報") {
+                    Section("settings.app.info") {
                         HStack {
-                            Label("バージョン", systemImage: "info.circle")
+                            Label("settings.version", systemImage: "info.circle")
                             Spacer()
                             Text(appVersion).foregroundStyle(.secondary)
                         }
                         HStack {
-                            Label("ビルド", systemImage: "hammer")
+                            Label("settings.build", systemImage: "hammer")
                             Spacer()
                             Text(buildNumber).foregroundStyle(.secondary)
                         }
@@ -58,7 +58,7 @@ struct SettingsView: View {
                         if entitlements.hasPremium {
                             HStack {
                                 Image(systemName: "checkmark.seal.fill").foregroundColor(.blue)
-                                Text("Premium会員").font(.headline)
+                                Text("settings.premium.member").font(.headline)
                                 Spacer()
                                 Text("✨")
                             }
@@ -68,30 +68,30 @@ struct SettingsView: View {
                             } label: {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text("Premiumにアップグレード").font(.headline).foregroundColor(.primary)
-                                        Text("すべての機能を解放").font(.caption).foregroundColor(.secondary)
+                                        Text("settings.premium.upgrade").font(.headline).foregroundColor(.primary)
+                                        Text("settings.premium.unlock").font(.caption).foregroundColor(.secondary)
                                     }
                                     Spacer()
                                     Image(systemName: "arrow.right.circle.fill").foregroundColor(.blue)
                                 }
                             }
                         }
-                    } header: { Text("Premium") }
+                    } header: { Text("settings.premium.section") }
 
-                    Section("その他") {
+                    Section("settings.other.section") {
                         Button(action: { openContactForm() }) {
-                            Label("お問い合わせ・バグ報告", systemImage: "envelope").foregroundStyle(.primary)
+                            Label("settings.contact", systemImage: "envelope").foregroundStyle(.primary)
                         }
                         Button(action: { showingPrivacyPolicy = true }) {
-                            Label("プライバシーポリシー", systemImage: "hand.raised").foregroundStyle(.primary)
+                            Label("settings.privacy", systemImage: "hand.raised").foregroundStyle(.primary)
                         }
                         Button(action: { showingTerms = true }) {
-                            Label("利用規約", systemImage: "doc.text").foregroundStyle(.primary)
+                            Label("settings.terms", systemImage: "doc.text").foregroundStyle(.primary)
                         }
                     }
 
                     Section {
-                        Picker("通知頻度", selection: Binding(
+                        Picker("settings.notifications.picker", selection: Binding(
                             get: { selectedFrequency },
                             set: { newValue in
                                 notificationFrequency = newValue.rawValue
@@ -103,31 +103,31 @@ struct SettingsView: View {
                             }
                         }
                     } header: {
-                        Text("通知設定")
+                        Text("settings.notifications.section")
                     } footer: {
-                        Text("レース記録の登録を促す通知の頻度を設定します。")
+                        Text("settings.notifications.footer")
                     }
 
                     Section {
-                        Picker("シーズン開始月", selection: $seasonStartMonthState) {
-                            ForEach(Array(1...12), id: \.self) { Text("\($0)月").tag($0) }
+                        Picker("settings.season.start", selection: $seasonStartMonthState) {
+                            ForEach(Array(1...12), id: \.self) { Text(Calendar.current.shortStandaloneMonthSymbols[$0 - 1]).tag($0) }
                         }
-                        LabeledContent("シーズン終了月") {
+                        LabeledContent("settings.season.end") {
                             let endMonth = seasonStartMonthState == 1 ? 12 : seasonStartMonthState - 1
-                            Text("\(endMonth)月")
+                            Text(Calendar.current.shortStandaloneMonthSymbols[endMonth - 1])
                                 .foregroundStyle(.secondary)
                         }
                     } header: {
-                        Text("シーズン設定")
+                        Text("settings.season.section")
                     } footer: {
-                        Text("シーズンは開始月から1年間です（例: 4月開始 → 4月〜翌年3月）")
+                        Text("settings.season.footer")
                     }
 
                     // (Manual dedupe button removed; automatic dedupe runs at startup.)
                 }
 
             }
-            .navigationTitle("設定")
+            .navigationTitle("settings.title")
             .sheet(isPresented: $showingPrivacyPolicy) {
                 if let url = URL(string: "https://tako-1012.github.io/riku-log_policies/privacy-policy.html") {
                     SafariView(url: url)
@@ -160,12 +160,12 @@ struct SettingsView: View {
             }
             if inserted > 0 {
                 do { try modelContext.save() } catch {
-                    initErrorMessage = "デフォルト種目の作成に失敗しました: \(error.localizedDescription)"
+                    initErrorMessage = String(format: String(localized: "settings.error.init %@"), error.localizedDescription)
                     showingInitError = true
                 }
             }
         }
-        .alert("初期化エラー", isPresented: $showingInitError) { Button("OK", role: .cancel) { } } message: { Text(initErrorMessage) }
+        .alert("settings.init.error", isPresented: $showingInitError) { Button("common.ok", role: .cancel) { } } message: { Text(initErrorMessage) }
         .onChange(of: seasonStartMonthState) { _, new in
             guard let profile = userProfiles.first else { return }
             profile.seasonStartMonth = new
@@ -173,7 +173,7 @@ struct SettingsView: View {
             let endMonth = new == 1 ? 12 : new - 1
             profile.seasonEndMonth = endMonth
             do { try modelContext.save() } catch {
-                initErrorMessage = "シーズン設定の保存に失敗しました: \(error.localizedDescription)"
+                initErrorMessage = String(format: String(localized: "settings.error.season %@"), error.localizedDescription)
                 showingInitError = true
             }
         }
@@ -193,17 +193,17 @@ extension SettingsView {
     // iCloud 表示は削除
 
     private var usageSection: some View {
-        Section { raceUsageRow } header: { Text("使用状況") }
+        Section { raceUsageRow } header: { Text("settings.usage.section") }
     }
 
     private var raceUsageRow: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("レース記録").font(.body)
+                Text("settings.usage.race").font(.body)
                 if entitlements.canUsePremiumFeatures {
-                    Text("無制限").font(.caption).foregroundColor(.green)
+                    Text("settings.usage.unlimited").font(.caption).foregroundColor(.green)
                 } else {
-                    Text("\(races.count)/50件").font(.caption).foregroundColor(races.count >= 45 ? .orange : .secondary)
+                    Text("settings.usage.count \(races.count)").font(.caption).foregroundColor(races.count >= 45 ? .orange : .secondary)
                 }
             }
             Spacer()
@@ -239,18 +239,22 @@ struct RaceDistanceManagementView: View {
 
     var body: some View {
         List {
-            // Display order: Track first, then Road, then Other
-            ForEach([RaceType.track, RaceType.road, RaceType.other], id: \.self) { raceType in
+            // Display order: Track, Road, Other, Field
+            ForEach([RaceType.track, RaceType.road, RaceType.other, RaceType.field], id: \.self) { raceType in
                 Section(raceType.displayName) {
                     let filteredDistances = allDistances.filter { $0.raceType == raceType && !isDeletedDistance($0) }
                     if filteredDistances.isEmpty {
-                        Text("種目が登録されていません").foregroundStyle(.secondary).italic()
+                        Text("event.management.empty").foregroundStyle(.secondary).italic()
                     } else {
                         ForEach(filteredDistances) { distance in
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(distance.name).font(.headline)
-                                    Text("距離: \(String(format: "%.3f", distance.distanceKm)) km").font(.subheadline).foregroundStyle(.secondary)
+                                    Text(distance.localizedName).font(.headline)
+                                    if !distance.isFieldEvent {
+                                        (Text("settings.event.distance.label") + Text(" \(String(format: "%.3f", distance.distanceKm)) km")).font(.subheadline).foregroundStyle(.secondary)
+                                    } else if let sub = distance.subcategoryRaw {
+                                        Text(sub == "jump" ? String(localized: "event.management.jump") : String(localized: "event.management.throw")).font(.subheadline).foregroundStyle(.secondary)
+                                    }
                                 }
                                 Spacer()
                                 Button(role: .destructive) {
@@ -263,23 +267,23 @@ struct RaceDistanceManagementView: View {
                             }
                         }
                     }
-                    Button(action: { showingAddSheet = true }) { Label("種目を追加", systemImage: "plus.circle.fill") }
+                    Button(action: { showingAddSheet = true }) { Label("event.management.add", systemImage: "plus.circle.fill") }
                 }
             }
         }
         .onAppear {
             Task { await performManagementViewAutoDedupe() }
         }
-        .navigationTitle("種目管理")
+        .navigationTitle("event.management.title")
         .sheet(isPresented: $showingAddSheet) { AddDistanceView { _ in } }
-        .alert("種目を削除", isPresented: $showingDeleteAlert, presenting: distanceToDelete) { distance in
-            Button("キャンセル", role: .cancel) { }
-            Button("削除", role: .destructive) { deleteDistance(distance) }
+        .alert("event.management.delete.title", isPresented: $showingDeleteAlert, presenting: distanceToDelete) { distance in
+            Button("common.cancel", role: .cancel) { }
+            Button("common.delete", role: .destructive) { deleteDistance(distance) }
         } message: { distance in
             if relatedRacesCount > 0 {
-                Text("この種目（\(distance.name)）を使用している\(relatedRacesCount)件のレース記録が存在します。\n\n種目を削除してもレース記録は残りますが、種目名が表示されなくなります。本当に削除しますか？")
+                Text(String(format: String(localized: "event.delete.with.races.message %@ %lld"), distance.localizedName, relatedRacesCount))
             } else {
-                Text("\(distance.name)を削除しますか？\n\nこの種目を使用しているレース記録はありません。")
+                Text(String(format: String(localized: "event.delete.no.races.message %@"), distance.localizedName))
             }
         }
     }
@@ -369,9 +373,9 @@ struct PrivacyPolicyView: View {
                     }.padding()
                 }
             }
-            .navigationTitle("プライバシーポリシー")
+            .navigationTitle("privacy.title")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完了") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("common.done") { dismiss() } } }
         }
     }
 }
@@ -394,9 +398,9 @@ struct TermsOfServiceView: View {
                     }.padding()
                 }
             }
-            .navigationTitle("利用規約")
+            .navigationTitle("terms.title")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完了") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("common.done") { dismiss() } } }
         }
     }
 }

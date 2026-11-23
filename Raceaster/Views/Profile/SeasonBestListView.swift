@@ -48,7 +48,7 @@ struct SeasonBestListView: View {
                     dist.matches(distance: r.totalDistance) && r.raceType == dist.raceType && r.date >= seasonStart && r.date <= seasonEnd
                 }
                 if let best = inSeason.min(by: { $0.totalTime < $1.totalTime }) {
-                    list.append(SeasonDistanceBest(distanceName: dist.name, date: best.date, time: best.totalTime))
+                    list.append(SeasonDistanceBest(distanceName: dist.localizedName, date: best.date, time: best.totalTime))
                 }
             }
 
@@ -66,7 +66,7 @@ struct SeasonBestListView: View {
         VStack(alignment: .leading, spacing: 8) {
 
             if seasonBestsByYear.isEmpty {
-                Text("過去のシーズンベストはありません")
+                Text("season.best.empty")
                     .foregroundColor(.secondary)
                     .padding(.vertical, 12)
             } else {
@@ -77,7 +77,7 @@ struct SeasonBestListView: View {
                         if expandedSeasons.contains(year) { expandedSeasons.remove(year) } else { expandedSeasons.insert(year) }
                     }) {
                         HStack(spacing: 12) {
-                            Text(String(year) + "シーズン")
+                            Text("season.year.label \(year)")
                                 .font(.subheadline)
                                 .bold()
                             Spacer()
@@ -115,7 +115,7 @@ struct SeasonBestListView: View {
 
                         ForEach(orderedTypes, id: \.self) { raceType in
                             let itemsForType = list.filter { sb in
-                                if let distModel = distances.first(where: { $0.name == sb.distanceName }) {
+                                if let distModel = distances.first(where: { $0.localizedName == sb.distanceName }) {
                                     return distModel.raceType == raceType
                                 }
                                 return false
@@ -197,7 +197,7 @@ struct SeasonBestListView: View {
     private func findRace(for sb: SeasonDistanceBest) -> RaceRecord? {
         // match by distance name and time and date (allow small tolerance)
         // find registered distance model
-            if let distModel = distances.first(where: { $0.name == sb.distanceName }) {
+            if let distModel = distances.first(where: { $0.localizedName == sb.distanceName }) {
             return races.first { r in
                 distModel.matches(distance: r.totalDistance) && r.raceType == distModel.raceType &&
                 abs(r.totalTime - sb.time) < 0.5 &&

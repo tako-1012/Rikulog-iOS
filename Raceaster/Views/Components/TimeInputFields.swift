@@ -40,7 +40,7 @@ struct TimeInputFields: View {
                             .frame(width: 70, height: 44)
                             .background(Color(.secondarySystemBackground))
                             .cornerRadius(8)
-                        Text("時間").font(.caption).foregroundStyle(.secondary)
+                        Text("common.hour").font(.caption).foregroundStyle(.secondary)
                     }
                     
                     Text(":").font(.title2).padding(.bottom, 20)
@@ -52,7 +52,7 @@ struct TimeInputFields: View {
                         .frame(width: 70, height: 44)
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(8)
-                    Text("分").font(.caption).foregroundStyle(.secondary)
+                    Text("common.minute").font(.caption).foregroundStyle(.secondary)
                 }
                 
                 Text(":").font(.title2).padding(.bottom, 20)
@@ -63,7 +63,7 @@ struct TimeInputFields: View {
                         .frame(width: 80, height: 44)
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(8)
-                    Text("秒").font(.caption).foregroundStyle(.secondary)
+                    Text("common.second").font(.caption).foregroundStyle(.secondary)
                 }
             }
         }

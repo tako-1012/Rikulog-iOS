@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>陸ログ</string>
+	<string>RikuLog</string>
 	<key>CFBundleExecutable</key>
 	<string>Raceaster</string>
 	<key>CFBundleIdentifier</key>
@@ -28,11 +28,11 @@
 		<true/>
 	</dict>
 	<key>NSPhotoLibraryAdditionsUsageDescription</key>
-	<string>作成した共有画像を写真ライブラリに保存するために使用します。</string>
+	<string>Used to save created share images to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>作成した共有画像を写真ライブラリに保存するために使用します。</string>
+	<string>Used to save created share images to your photo library.</string>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>より関連性の高い広告を表示するために、他社のアプリやWebサイトでのアクティビティを追跡します。Premium版では広告が表示されません。</string>
+	<string>We use your activity across other apps and websites to show you more relevant ads. Ads are not shown in the Premium version.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

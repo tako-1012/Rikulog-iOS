@@ -20,7 +20,7 @@ struct EditLapTimeView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("ラップ情報") {
+                Section("lap.info.section") {
                     HStack {
                         Text("Lap \(lapNumber)")
                         Spacer()
@@ -31,7 +31,7 @@ struct EditLapTimeView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Section("タイム") {
+                Section("lap.time.section") {
                     HStack(spacing: 12) {
                         VStack {
                             TextField("0", text: $hoursText)
@@ -41,7 +41,7 @@ struct EditLapTimeView: View {
                                 .submitLabel(.done)
                                 .onSubmit { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
                                 .clearZeroOnFocus($hoursText)
-                            Text("時間").font(.caption).foregroundStyle(.secondary)
+                            Text("common.hour").font(.caption).foregroundStyle(.secondary)
                         }
                         Text(":").font(.title2)
                         VStack {
@@ -52,7 +52,7 @@ struct EditLapTimeView: View {
                                 .submitLabel(.done)
                                 .onSubmit { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
                                 .clearZeroOnFocus($minutesText)
-                            Text("分").font(.caption).foregroundStyle(.secondary)
+                            Text("common.minute").font(.caption).foregroundStyle(.secondary)
                         }
                         Text(":").font(.title2)
                         VStack {
@@ -63,7 +63,7 @@ struct EditLapTimeView: View {
                                 .submitLabel(.done)
                                 .onSubmit { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
                                 .clearZeroOnFocus($secondsText)
-                            Text("秒").font(.caption).foregroundStyle(.secondary)
+                            Text("common.second").font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -71,17 +71,17 @@ struct EditLapTimeView: View {
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
+                    Button("common.cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button("common.save") {
                         normalizeEditFields()
                         let h = Int(hoursText) ?? 0
                         let m = Int(minutesText) ?? 0
                         let s = Double(secondsText) ?? 0.0
                         let total = h * 3600 + m * 60 + Int(s.rounded())
                         guard total > 0 else {
-                            errorMessage = "有効なタイムを入力してください"
+                            errorMessage = String(localized: "lap.error.invalid.time")
                             showingError = true
                             return
                         }
@@ -95,8 +95,8 @@ struct EditLapTimeView: View {
                 // close keyboard when done
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
-            .alert("エラー", isPresented: $showingError) {
-                Button("OK", role: .cancel) {}
+            .alert("common.error", isPresented: $showingError) {
+                Button("common.ok", role: .cancel) {}
             } message: {
                 Text(errorMessage)
             }
@@ -130,21 +130,21 @@ struct EditLapTimeView: View {
 
 /// ラップ追加ビュー
 struct AddLapView: View {
-    var onAdd: ([LapData]) -> Void
+    var onAdd: ([LapInput]) -> Void
     var raceType: RaceType
     var totalDistance: Double
     // Optional provider to obtain the most-recent total distance from the parent when
     // the value passed in may be stale due to UI binding timing. Called only when
     // `totalDistance` is 0.0 to avoid overwriting an explicit value.
     var totalDistanceProvider: (() -> Double)? = nil
-    var initialLaps: [LapData]? = nil
+    var initialLaps: [LapInput]? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPreset: String = "400m"
     @State private var distanceText: String = ""
     @State private var distanceTextWorkItem: DispatchWorkItem? = nil
     @State private var lapMinutes: [String] = []
     @State private var lapSeconds: [String] = []
-    @State private var autoLaps: [LapData] = []
+    @State private var autoLaps: [LapInput] = []
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var hasInitialized = false
@@ -155,7 +155,7 @@ struct AddLapView: View {
     // If the parent passes an empty array (common when creating a new race),
     // we should still auto-generate laps instead of treating it as edit mode.
     private var isEditMode: Bool { (initialLaps != nil) && !(initialLaps?.isEmpty ?? true) }
-    private func detectPresetFromLaps(_ laps: [LapData]) -> String {
+    private func detectPresetFromLaps(_ laps: [LapInput]) -> String {
         guard !laps.isEmpty else { return raceType == .track ? "400m" : "1km" }
         let lapDist = laps[0].distance
         if raceType == .track {
@@ -172,39 +172,39 @@ struct AddLapView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("ラッププリセット") {
+                Section("lap.preset.section") {
                     if raceType == .track {
-                        Picker("プリセット", selection: $selectedPreset) {
+                        Picker("lap.preset.picker", selection: $selectedPreset) {
                             Text("400m").tag("400m")
                             Text("1000m").tag("1000m")
-                            Text("カスタム").tag("custom")
+                            Text("common.custom").tag("custom")
                         }
                         .pickerStyle(.segmented)
                     } else {
-                        Picker("プリセット", selection: $selectedPreset) {
+                        Picker("lap.preset.picker", selection: $selectedPreset) {
                             Text("1km").tag("1km")
                             Text("5km").tag("5km")
-                            Text("カスタム").tag("custom")
+                            Text("common.custom").tag("custom")
                         }
                         .pickerStyle(.segmented)
                     }
                     if selectedPreset == "custom" {
                         let unitLabel = raceType == .track ? "(m)" : "(km)"
-                        TextField("区間距離 \(unitLabel)", text: $distanceText)
+                        TextField(String(format: String(localized: "lap.segment.distance.placeholder %@"), unitLabel), text: $distanceText)
                             .keyboardType(.decimalPad)
                             .submitLabel(.done)
                             .onSubmit { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
                     }
                 }
-                Section("ラップ入力") {
+                Section("lap.input.section") {
                     ForEach(Array(autoLaps.enumerated()), id: \.element.id) { index, lapData in
                         HStack {
                             Text("Lap \(index + 1)")
                             let distanceDisplay = raceType == .track
                                 ? String(format: "%.0f", lapData.distance * 1000) + "m"
                                 : String(format: "%.2f", lapData.distance) + "km"
-                            Text("距離: \(distanceDisplay)")
-                            TextField("分", text: getMinutesBinding(index))
+                            Text("lap.distance.label") + Text(" \(distanceDisplay)")
+                            TextField("common.minute", text: getMinutesBinding(index))
                                 .keyboardType(.numberPad)
                                 .frame(width: 40)
                                 .submitLabel(.done)
@@ -214,7 +214,7 @@ struct AddLapView: View {
                                 }
                                 .clearZeroOnFocus(getMinutesBinding(index))
                             Text(":")
-                            TextField("秒", text: getSecondsBinding(index))
+                            TextField("common.second", text: getSecondsBinding(index))
                                 .keyboardType(.decimalPad)
                                 .frame(width: 60)
                                 .submitLabel(.done)
@@ -225,7 +225,7 @@ struct AddLapView: View {
                 }
                 Section {
                     HStack {
-                        Text("合計タイム").fontWeight(.semibold)
+                        Text("lap.total.time").fontWeight(.semibold)
                         Spacer()
                         Text(formatTotalTimeDecimal())
                             .fontWeight(.semibold)
@@ -236,18 +236,18 @@ struct AddLapView: View {
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
+                    Button("common.cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { addLaps() }
+                    Button("common.save") { addLaps() }
                 }
                 // Keyboard Done toolbar provided by parent views
             }
             .keyboardDoneToolbar {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
-            .alert("エラー", isPresented: $showingError) {
-                Button("OK", role: .cancel) {}
+            .alert("common.error", isPresented: $showingError) {
+                Button("common.ok", role: .cancel) {}
             } message: {
                 Text(errorMessage)
             }
@@ -393,13 +393,13 @@ struct AddLapView: View {
             autoLaps = []
             return
         }
-        var laps: [LapData] = []
+        var laps: [LapInput] = []
         var remain = effectiveTotalDistance
         let maxLaps = 1000
         var count = 0
         while remain > 0.0001 && count < maxLaps {
             let d = min(lapDist, remain)
-            laps.append(LapData(distance: d, time: 0))
+            laps.append(LapInput(distance: d, time: 0))
             remain -= d
             count += 1
         }
@@ -409,18 +409,18 @@ struct AddLapView: View {
     }
 
     /// Generate 400m splits from a total distance (km) — returns laps in km units.
-    private func generate400Splits(totalDistanceKm: Double) -> [LapData] {
-        var result: [LapData] = []
+    private func generate400Splits(totalDistanceKm: Double) -> [LapInput] {
+        var result: [LapInput] = []
         let totalMeters = Int(round(totalDistanceKm * 1000))
         guard totalMeters >= 100 else { return result }
         let full400 = totalMeters / 400
         let remainder = totalMeters - full400 * 400
         for _ in 0..<full400 {
-            result.append(LapData(distance: 0.4, time: 0))
+            result.append(LapInput(distance: 0.4, time: 0))
         }
         if remainder > 0 {
             let remKm = Double(remainder) / 1000.0
-            result.append(LapData(distance: remKm, time: 0))
+            result.append(LapInput(distance: remKm, time: 0))
         }
         print("[LapViews] generate400Splits: totalMeters=\(totalMeters) full=\(full400) remainder=\(remainder) -> \(result.count) laps")
         return result
@@ -431,16 +431,16 @@ struct AddLapView: View {
             let minutes = Double(lapMinutes[index]) ?? 0
             let seconds = Double(lapSeconds[index]) ?? 0
             if minutes * 60 + seconds <= 0 {
-                errorMessage = "\(index + 1)区間のタイムを入力してください"
+                errorMessage = String(format: String(localized: "lap.error.segment.time %lld"), index + 1)
                 showingError = true
                 return
             }
         }
-        var completed: [LapData] = []
+        var completed: [LapInput] = []
         for (index, lap) in autoLaps.enumerated() {
             let minutes = Double(lapMinutes[index]) ?? 0
             let seconds = Double(lapSeconds[index]) ?? 0
-            completed.append(LapData(distance: lap.distance, time: minutes * 60 + seconds))
+            completed.append(LapInput(distance: lap.distance, time: minutes * 60 + seconds))
         }
         onAdd(completed)
         // Ensure all inputs normalized and keyboard dismissed before closing

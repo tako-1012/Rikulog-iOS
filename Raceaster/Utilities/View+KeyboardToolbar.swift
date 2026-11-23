@@ -8,7 +8,7 @@ extension View {
         self.toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer() // ボタンを右端に寄せる
-                Button("完了") {
+                Button("keyboard.done") {
                     // 1. 指定されたアクションを実行（もしあれば）
                     action()
                     // 2. キーボードを閉じる

@@ -32,9 +32,9 @@ struct ShareRaceView: View {
         var id: String { rawValue }
         var displayName: String {
             switch self {
-            case .standard: return "標準 (4:3)"
-            case .square: return "正方形 (1:1)"
-            case .story: return "ストーリー (9:16)"
+            case .standard: return String(localized: "share.card.standard")
+            case .square: return String(localized: "share.card.square")
+            case .story: return String(localized: "share.card.story")
             }
         }
         
@@ -74,23 +74,23 @@ struct ShareRaceView: View {
                 
                 // Settings List
                 List {
-                    Section("表示オプション") {
-                        Toggle("大会名", isOn: $showRaceName)
-                        Toggle("タイム", isOn: $showTime)
-                        Toggle("日付", isOn: $showDate)
+                    Section("share.display.options") {
+                        Toggle("share.show.race.name", isOn: $showRaceName)
+                        Toggle("share.show.time", isOn: $showTime)
+                        Toggle("share.show.date", isOn: $showDate)
                         if race.ranking != nil {
-                            Toggle("順位 (全体)", isOn: $showRank)
+                            Toggle("share.show.rank.overall", isOn: $showRank)
                         }
                         if personalRankTitle != nil {
-                            Toggle("順位 (自己評価)", isOn: $showPersonalRank)
+                            Toggle("share.show.rank.personal", isOn: $showPersonalRank)
                         }
                         if !race.memo.isEmpty {
-                            Toggle("メモ", isOn: $showMemo)
+                            Toggle("share.show.memo", isOn: $showMemo)
                         }
                     }
-                    
-                    Section("サイズ設定") {
-                        Picker("カード比率", selection: $selectedCardRatio) {
+
+                    Section("share.size.section") {
+                        Picker("share.card.ratio", selection: $selectedCardRatio) {
                             ForEach(CardRatio.allCases) { ratio in
                                 Text(ratio.displayName).tag(ratio)
                             }
@@ -104,7 +104,7 @@ struct ShareRaceView: View {
                     Button(action: { showingShareSheet = true }) {
                         HStack {
                             Image(systemName: "square.and.arrow.up")
-                            Text("共有する")
+                            Text("share.action.share")
                         }
                         .font(.headline)
                         .foregroundStyle(.white)
@@ -117,7 +117,7 @@ struct ShareRaceView: View {
                     Button(action: saveToPhotos) {
                         HStack {
                             Image(systemName: "square.and.arrow.down")
-                            Text("画像を保存")
+                            Text("share.action.save")
                         }
                         .font(.headline)
                         .foregroundStyle(.blue)
@@ -131,20 +131,20 @@ struct ShareRaceView: View {
                 .background(Color(uiColor: .systemBackground))
                 .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: -4)
             }
-            .navigationTitle("共有画像の作成")
+            .navigationTitle("share.title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { dismiss() }
+                    Button("common.close") { dismiss() }
                 }
             }
             .sheet(isPresented: $showingShareSheet) {
                 ActivityView(activityItems: [generateUIImage()])
             }
-            .alert("保存完了", isPresented: $showSaveAlert) {
-                Button("OK", role: .cancel) { }
+            .alert("share.save.success", isPresented: $showSaveAlert) {
+                Button("common.ok", role: .cancel) { }
             } message: {
-                Text("写真ライブラリに保存しました。")
+                Text("share.save.message")
             }
             .onAppear {
                 calculatePersonalRank()
@@ -173,7 +173,7 @@ struct ShareRaceView: View {
         let content = generatedCardView().frame(width: size.width, height: size.height)
         let renderer = ImageRenderer(content: content)
         // Retinaスケール（3倍など）を適用して高解像度化
-        renderer.scale = UIScreen.main.scale * 2.0 // より高画質にするためスケールを調整
+        renderer.scale = min(UIScreen.main.scale * 2.0, 4.0) // より高画質にするためスケールを調整
         return renderer.uiImage ?? UIImage()
     }
     
@@ -197,17 +197,28 @@ struct ShareRaceView: View {
             $0.raceType == race.raceType &&
             abs($0.totalDistance - race.totalDistance) < 0.01
         }
-        
+
+        // フィールド種目は記録が大きい方が優秀
+        if !race.raceType.smallerIsBetter {
+            let sorted = matchingRaces.sorted {
+                ($0.fieldHeight ?? $0.fieldDistance ?? 0) > ($1.fieldHeight ?? $1.fieldDistance ?? 0)
+            }
+            if let index = sorted.firstIndex(where: { $0.id == race.id }) {
+                personalRankTitle = index == 0 ? "PB" : index == 1 ? String(localized: "rank.alert.2nd.title") : index == 2 ? String(localized: "rank.alert.3rd.title") : nil
+            }
+            return
+        }
+
         let sorted = matchingRaces.sorted { $0.totalTime < $1.totalTime }
-        
+
         if let index = sorted.firstIndex(where: { $0.id == race.id }) {
             let rank = index + 1
             if rank == 1 {
                 personalRankTitle = "PB"
             } else if rank == 2 {
-                personalRankTitle = "歴代2位"
+                personalRankTitle = String(localized: "rank.alert.2nd.title")
             } else if rank == 3 {
-                personalRankTitle = "歴代3位"
+                personalRankTitle = String(localized: "rank.alert.3rd.title")
             } else {
                 // Fiscal Year Logic
                 let startMonth = userProfile.seasonStartMonth

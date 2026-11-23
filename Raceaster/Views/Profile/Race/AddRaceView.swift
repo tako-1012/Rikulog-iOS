@@ -20,7 +20,7 @@ struct AddRaceView: View {
     @State private var groupText: String = ""
     @State private var isRelay: Bool = false
     @State private var relayStageText: String = ""
-    @State private var laps: [LapData] = []
+    @State private var laps: [LapInput] = []
     @State private var activeSheet: ActiveSheet? = nil
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -32,12 +32,24 @@ struct AddRaceView: View {
     @State private var customDistanceText: String = ""
     @State private var useCustomDistance = false
     @State private var includeInVDOT: Bool = true
-    
+
+    // MARK: - フィールド種目専用状態
+    @State private var fieldMetersText: String = ""
+    @State private var fieldCmText: String = ""
+    @State private var windSpeedText: String = ""
+    @State private var fieldAttempts: [FieldAttempt] = []
+    @State private var fieldHeightAttempts: [FieldHeightAttempt] = []
+
     @FocusState private var isEditingFields: Bool
     @FocusState private var focusedTimeField: TimeInputFields.FocusedField?
 
     @Query(sort: \RaceDistance.distanceKm) private var distances: [RaceDistance]
     var raceToEdit: RaceRecord? = nil
+
+    /// 現在選択中のフィールド種目
+    private var selectedFieldDistance: RaceDistance? {
+        distances.first { $0.persistentModelID == selectedDistanceId }
+    }
 
     // MARK: - 初期化 (既存データの復元ロジックを完全維持)
     init(raceToEdit: RaceRecord? = nil) {
@@ -46,22 +58,44 @@ struct AddRaceView: View {
             _raceName = State(initialValue: r.raceName)
             _date = State(initialValue: r.date)
             _raceType = State(initialValue: r.raceType)
-            let comp = breakdownTimeStatic(r.totalTime)
-            _hoursText = State(initialValue: String(comp.h))
-            _minutesText = State(initialValue: String(comp.m))
-            _secondsText = State(initialValue: String(format: "%.2f", comp.s))
             _memo = State(initialValue: r.memo)
-            _trackMeetType = State(initialValue: r.trackMeetType ?? .timeTrial)
             _rankingText = State(initialValue: r.ranking.map { String($0) } ?? "")
-            _officialTimeText = State(initialValue: r.officialTime.map { String($0) } ?? "")
-            _groupText = State(initialValue: r.group.map { String($0) } ?? "")
-            _relayStageText = State(initialValue: r.relayStage.map { String($0) } ?? "")
-            _isRelay = State(initialValue: r.isRelay)
-            _laps = State(initialValue: (r.laps ?? []).sorted(by: { $0.lapNumber < $1.lapNumber }).map { LapData(distance: $0.distance, time: $0.time) })
             _includeInVDOT = State(initialValue: r.includeInVDOT)
-            _useCustomDistance = State(initialValue: true)
-            _isOtherSelected = State(initialValue: true)
-            _customDistanceText = State(initialValue: String(format: "%.3f", r.totalDistance))
+
+            if r.raceType == .field {
+                // フィールド種目の復元
+                let fieldVal = r.fieldHeight ?? r.fieldDistance ?? 0
+                let m = Int(fieldVal)
+                let cm = Int(((fieldVal - Double(m)) * 100).rounded())
+                _fieldMetersText = State(initialValue: m > 0 ? String(m) : "")
+                _fieldCmText = State(initialValue: cm > 0 ? String(format: "%02d", cm) : "")
+                _windSpeedText = State(initialValue: r.windSpeed.map { String(format: "%.1f", $0) } ?? "")
+                if let json = r.attemptResults {
+                    // JSON から試技を復元（高さ種目か否かで分岐）
+                    let heightAttempts = FieldAttemptJSON.decodeHeightAttempts(from: json)
+                    let flatAttempts = FieldAttemptJSON.decodeAttempts(from: json)
+                    _fieldHeightAttempts = State(initialValue: heightAttempts)
+                    _fieldAttempts = State(initialValue: flatAttempts)
+                }
+                // 種目選択を復元（distanceKm で照合）
+                _useCustomDistance = State(initialValue: false)
+                _isOtherSelected = State(initialValue: false)
+            } else {
+                // 既存の走種目の復元
+                let comp = breakdownTimeStatic(r.totalTime)
+                _hoursText = State(initialValue: String(comp.h))
+                _minutesText = State(initialValue: String(comp.m))
+                _secondsText = State(initialValue: String(format: "%.2f", comp.s))
+                _trackMeetType = State(initialValue: r.trackMeetType ?? .timeTrial)
+                _officialTimeText = State(initialValue: r.officialTime.map { String($0) } ?? "")
+                _groupText = State(initialValue: r.group.map { String($0) } ?? "")
+                _relayStageText = State(initialValue: r.relayStage.map { String($0) } ?? "")
+                _isRelay = State(initialValue: r.isRelay)
+                _laps = State(initialValue: (r.laps ?? []).sorted(by: { $0.lapNumber < $1.lapNumber }).map { LapInput(distance: $0.distance, time: $0.time) })
+                _useCustomDistance = State(initialValue: true)
+                _isOtherSelected = State(initialValue: true)
+                _customDistanceText = State(initialValue: String(format: "%.3f", r.totalDistance))
+            }
         }
     }
 
@@ -74,26 +108,51 @@ struct AddRaceView: View {
                     basicSection
                     distanceSection
                 }
-                Group {
-                    timeSection
-                    competitionSection
-                    memoAndVDOTSection
-                    lapSection
+                if raceType == .field {
+                    Group {
+                        fieldRecordSection
+                        fieldCompetitionSection
+                        memoSection
+                    }
+                } else {
+                    Group {
+                        timeSection
+                        competitionSection
+                        memoAndVDOTSection
+                        lapSection
+                    }
                 }
             }
-            .navigationTitle(raceToEdit == nil ? "レース記録を追加" : "レース記録を編集")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("keyboard.done") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
+            .navigationTitle(raceToEdit == nil ? LocalizedStringKey("race.add.title") : LocalizedStringKey("race.edit.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
+                    Button("common.cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { saveRace() }.bold()
+                    Button("common.save") { saveRace() }.bold()
+                }
+            }
+            .onAppear {
+                // フィールド種目の編集時：init では @Query にアクセスできないため
+                // onAppear で selectedDistanceId を復元する
+                if let r = raceToEdit, r.raceType == .field, selectedDistanceId == nil {
+                    selectedDistanceId = distances.first {
+                        abs($0.distanceKm - r.totalDistance) < 0.001 && $0.raceType == .field
+                    }?.persistentModelID
                 }
             }
             .sheet(item: $activeSheet) { sheetDestination(for: $0) }
-            .alert("エラー", isPresented: $showingError) {
-                Button("OK") { }
+            .alert("common.error", isPresented: $showingError) {
+                Button("common.ok") { }
             } message: {
                 Text(errorMessage)
             }
@@ -109,35 +168,79 @@ struct AddRaceView: View {
 // MARK: - UI Sections (Viewを分割してコンパイルエラーを回避)
 extension AddRaceView {
     private var typeSection: some View {
-        Section("レース種類") {
-            Picker("種類", selection: $raceType) {
-                Text("トラック").tag(RaceType.track)
-                Text("ロード").tag(RaceType.road)
-                Text("その他").tag(RaceType.other)
+        Section("race.type.section") {
+            Picker("race.type.picker.label", selection: $raceType) {
+                Text("race.type.track").tag(RaceType.track)
+                Text("race.type.road").tag(RaceType.road)
+                Text("race.type.field").tag(RaceType.field)
+                Text("race.type.other").tag(RaceType.other)
             }
             .pickerStyle(.segmented)
             .onChange(of: raceType) { _, _ in resetDistanceSelection() }
         }
     }
 
-    private var basicSection: some View {
-        Section("基本情報") {
-            TextField("大会名", text: $raceName)
+    // MARK: フィールド種目 最高記録・試技入力セクション
+    @ViewBuilder
+    private var fieldRecordSection: some View {
+        if let fd = selectedFieldDistance {
+            if fd.isHeightEvent {
+                VerticalFieldSection(
+                    eventName: fd.localizedName,
+                    metersText: $fieldMetersText,
+                    cmText: $fieldCmText,
+                    heightAttempts: $fieldHeightAttempts
+                )
+            } else {
+                HorizontalFieldSection(
+                    eventName: fd.localizedName,
+                    isJumpEvent: fd.subcategoryRaw == "jump",
+                    metersText: $fieldMetersText,
+                    cmText: $fieldCmText,
+                    windSpeedText: $windSpeedText,
+                    attempts: $fieldAttempts
+                )
+            }
+        } else {
+            Section("race.record.section") {
+                Text("race.event.placeholder")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: フィールド種目 競技情報（順位のみ）
+    private var fieldCompetitionSection: some View {
+        Section("race.competition.section") {
+            HStack {
+                Text("race.competition.rank")
+                TextField("race.competition.rank", text: $rankingText)
+                    .keyboardType(.numberPad)
+                    .focused($isEditingFields)
+            }
+        }
+    }
+
+    // MARK: メモのみ（フィールド種目用）
+    private var memoSection: some View {
+        Section("race.memo.section") {
+            TextEditor(text: $memo)
+                .frame(minHeight: 80)
                 .focused($isEditingFields)
-                .toolbar {
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button("完了") { isEditingFields = false }
-                    }
-                }
-            DatePicker("開催日", selection: $date, in: ...Date(), displayedComponents: .date)
-                .environment(\.locale, Locale(identifier: "ja_JP"))
+        }
+    }
+
+    private var basicSection: some View {
+        Section("race.basic.section") {
+            TextField("race.basic.name", text: $raceName)
+                .focused($isEditingFields)
+            DatePicker("race.basic.date", selection: $date, in: ...Date(), displayedComponents: .date)
         }
     }
 
     private var distanceSection: some View {
-        Section("種目（距離）") {
-            Text("登録種目数: \(distances.filter { $0.raceType == raceType }.count)").font(.caption).foregroundStyle(.secondary)
+        Section(raceType == .field ? LocalizedStringKey("race.event.section") : LocalizedStringKey("race.event.section.distance")) {
+            Text("race.event.count \(distances.filter { $0.raceType == raceType }.count)").font(.caption).foregroundStyle(.secondary)
             DistancePickerView(
                 raceType: raceType, distances: distances,
                 selectedDistanceId: $selectedDistanceId, isOtherSelected: $isOtherSelected,
@@ -146,7 +249,7 @@ extension AddRaceView {
             )
             if useCustomDistance && isOtherSelected {
                 HStack {
-                    TextField("距離 (km)", text: $customDistanceText).keyboardType(.decimalPad).focused($isEditingFields)
+                    TextField("race.distance.km", text: $customDistanceText).keyboardType(.decimalPad).focused($isEditingFields)
                     Text("km")
                 }
             }
@@ -154,49 +257,46 @@ extension AddRaceView {
     }
 
     private var timeSection: some View {
-        Section("正式タイム") {
-            TimeInputFields(hoursText: $hoursText, minutesText: $minutesText, secondsText: $secondsText, focusedField: _focusedTimeField, onNormalize: { normalizeTime() }, accessoryEnabled: true)
+        Section("race.time.section") {
+            TimeInputFields(hoursText: $hoursText, minutesText: $minutesText, secondsText: $secondsText, focusedField: _focusedTimeField, onNormalize: {
+                let n = TimeInputNormalizer.normalize(hoursText: hoursText, minutesText: minutesText, secondsText: secondsText)
+                hoursText = n.hours; minutesText = n.minutes; secondsText = n.seconds
+            }, accessoryEnabled: true)
         }
     }
 
     @ViewBuilder
     private var competitionSection: some View {
         if raceType == .track {
-            Section("競技情報") {
-                Picker("種別", selection: $trackMeetType) {
-                    Text("記録会").tag(TrackMeetType.timeTrial)
-                    Text("予選").tag(TrackMeetType.preliminary)
-                    Text("決勝").tag(TrackMeetType.final)
+            Section("race.competition.section") {
+                Picker("race.competition.type.picker", selection: $trackMeetType) {
+                    Text("race.competition.time.trial").tag(TrackMeetType.timeTrial)
+                    Text("race.competition.preliminary").tag(TrackMeetType.preliminary)
+                    Text("race.competition.final").tag(TrackMeetType.final)
                 }.pickerStyle(.segmented)
                 HStack { 
-                    Text("組")
-                    TextField("組", text: $groupText).keyboardType(.numberPad).focused($isEditingFields)
-                        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完了") { isEditingFields = false } } }
-                    Text("組") 
+                    Text("race.competition.group")
+                    TextField("race.competition.group", text: $groupText).keyboardType(.numberPad).focused($isEditingFields)
+                    Text("race.competition.group") 
                 }
-                HStack { 
-                    Text("順位")
-                    TextField("順位", text: $rankingText).keyboardType(.numberPad).focused($isEditingFields)
-                        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完了") { isEditingFields = false } } }
-                    Text("位") 
+                HStack {
+                    Text("race.competition.rank")
+                    TextField("race.competition.rank", text: $rankingText).keyboardType(.numberPad).focused($isEditingFields)
                 }
             }
         } else if raceType == .road {
-            Section("競技情報") {
-                Toggle("駅伝", isOn: $isRelay)
+            Section("race.competition.section") {
+                Toggle("race.competition.relay", isOn: $isRelay)
                 if isRelay {
-                    HStack { 
-                        Text("区間")
-                        TextField("区間", text: $relayStageText).keyboardType(.numberPad).focused($isEditingFields)
-                            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完了") { isEditingFields = false } } }
-                        Text("区") 
+                    HStack {
+                        Text("race.competition.relay.stage")
+                        TextField("race.competition.relay.stage", text: $relayStageText).keyboardType(.numberPad).focused($isEditingFields)
+                        Text("race.relay.stage.suffix")
                     }
                 }
-                HStack { 
-                    Text("順位")
-                    TextField("順位", text: $rankingText).keyboardType(.numberPad).focused($isEditingFields)
-                        .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("完了") { isEditingFields = false } } }
-                    Text("位") 
+                HStack {
+                    Text("race.competition.rank")
+                    TextField("race.competition.rank", text: $rankingText).keyboardType(.numberPad).focused($isEditingFields)
                 }
             }
         }
@@ -204,21 +304,15 @@ extension AddRaceView {
 
     private var memoAndVDOTSection: some View {
         Group {
-            Section("メモ") {
+            Section("race.memo.section") {
                 TextEditor(text: $memo)
                     .frame(minHeight: 100)
                     .focused($isEditingFields)
-                    .toolbar {
-                        ToolbarItemGroup(placement: .keyboard) {
-                            Spacer()
-                            Button("完了") { isEditingFields = false }
-                        }
-                    }
             }
             Section {
-                Toggle("VDOT計測に含める", isOn: $includeInVDOT)
+                Toggle("race.vdot.toggle", isOn: $includeInVDOT)
             } footer: {
-                Text("駆け引きのあるレースなど、実力を反映しない記録の場合はオフにしてください")
+                Text("race.vdot.footer")
             }
         }
     }
@@ -233,15 +327,21 @@ extension AddRaceView {
 // MARK: - Logic (保存処理などを完全復元)
 extension AddRaceView {
     func saveRace() {
-        if raceName.isEmpty { errorMessage = "大会名を入力してください"; showingError = true; return }
-        
+        if raceName.isEmpty { errorMessage = String(localized: "race.basic.name") + String(localized: "common.error"); showingError = true; return }
+
+        // フィールド種目は専用の保存ロジックへ
+        if raceType == .field {
+            saveFieldRace()
+            return
+        }
+
         let dist = useCustomDistance ? (Double(customDistanceText) ?? 0) : (distances.first { $0.persistentModelID == selectedDistanceId }?.distanceKm ?? 0)
         let minAllowedDistanceKm: Double = (raceType == .track) ? 0.1 : 0.1
-        if dist < minAllowedDistanceKm || dist > 500 { errorMessage = "有効な距離を入力してください"; showingError = true; return }
+        if dist < minAllowedDistanceKm || dist > 500 { errorMessage = String(localized: "race.distance.km"); showingError = true; return }
 
         let h = Double(hoursText) ?? 0; let m = Double(minutesText) ?? 0; let s = Double(secondsText) ?? 0
         let total = h * 3600 + m * 60 + s
-        if total <= 0 || total >= 86400 { errorMessage = "有効なタイムを入力してください"; showingError = true; return }
+        if total <= 0 || total >= 86400 { errorMessage = String(localized: "race.time.section"); showingError = true; return }
 
         do {
                 if let r = raceToEdit {
@@ -263,7 +363,7 @@ extension AddRaceView {
                 }
             } else {
                 // 新規作成
-                let lapModels = laps.enumerated().map { (i, d) in Lap(lapNumber: i + 1, distance: d.distance, time: d.time) }
+                let lapModels = laps.enumerated().map { (i, d) in Lap.from(d, lapNumber: i + 1) }
                 let new = RaceRecord(raceName: raceName, date: date, raceType: raceType, totalDistance: dist, totalTime: total, memo: memo, trackMeetType: (raceType == .track ? trackMeetType : nil), ranking: Int(rankingText), laps: lapModels, officialTime: Double(officialTimeText) ?? total, includeInVDOT: includeInVDOT, group: Int(groupText), isRelay: (raceType == .road ? isRelay : false), relayStage: Int(relayStageText))
                 lapModels.forEach { $0.raceRecord = new; modelContext.insert($0) }
                 modelContext.insert(new)
@@ -284,10 +384,67 @@ extension AddRaceView {
                 dismiss()
             }
         } catch {
-            errorMessage = "保存に失敗しました"; showingError = true
+            errorMessage = String(localized: "common.error"); showingError = true
         }
     }
     
+    // MARK: - フィールド種目 保存処理
+    private func saveFieldRace() {
+        guard let fd = selectedFieldDistance else {
+            errorMessage = String(localized: "race.event.section"); showingError = true; return
+        }
+
+        let meters = Double(fieldMetersText) ?? 0
+        let cm = Double(fieldCmText) ?? 0
+        let fieldValue = meters + cm / 100
+        if fieldValue <= 0 { errorMessage = String(localized: "race.detail.record"); showingError = true; return }
+
+        let isHeight = fd.isHeightEvent
+        let ws = Double(windSpeedText)
+        let windAided = ws.map { $0 > 2.0 } ?? false
+
+        // 試技結果のJSON化
+        let attemptsJSON: String?
+        if isHeight {
+            attemptsJSON = fieldHeightAttempts.isEmpty ? nil : FieldAttemptJSON.encode(heightAttempts: fieldHeightAttempts)
+        } else {
+            attemptsJSON = fieldAttempts.isEmpty ? nil : FieldAttemptJSON.encode(attempts: fieldAttempts)
+        }
+
+        // distanceKm を totalDistance として使用（種目識別子として機能）
+        let identifierKm = fd.distanceKm
+
+        do {
+            if let r = raceToEdit {
+                r.raceName = raceName; r.date = date; r.raceType = .field
+                r.totalDistance = identifierKm; r.totalTime = 1.0  // 走タイムは不使用
+                r.memo = memo; r.ranking = Int(rankingText)
+                r.fieldDistance = isHeight ? nil : fieldValue
+                r.fieldHeight = isHeight ? fieldValue : nil
+                r.attemptResults = attemptsJSON
+                r.windSpeed = ws; r.isWindAided = windAided
+                r.includeInVDOT = false  // フィールド種目はVDOT対象外
+            } else {
+                let new = RaceRecord(
+                    raceName: raceName, date: date, raceType: .field,
+                    totalDistance: identifierKm, totalTime: 1.0,
+                    memo: memo, ranking: Int(rankingText), includeInVDOT: false
+                )
+                new.fieldDistance = isHeight ? nil : fieldValue
+                new.fieldHeight = isHeight ? fieldValue : nil
+                new.attemptResults = attemptsJSON
+                new.windSpeed = ws; new.isWindAided = windAided
+                modelContext.insert(new)
+            }
+            try modelContext.save()
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            dismiss()
+        } catch {
+            errorMessage = String(localized: "common.error"); showingError = true
+        }
+    }
+
     private func checkRanking(distance: Double, time: Double, raceType: RaceType) {
         let matchingDistance = distances.first { d in
             d.matches(distance: distance) && d.raceType == raceType
@@ -308,32 +465,27 @@ extension AddRaceView {
         guard let rank = sorted.firstIndex(where: { abs($0.totalTime - time) < 0.01 }) else { return }
         let position = rank + 1 // 1-indexed
         
-        let name = distModel.name
+        let name = distModel.localizedName
         let totalCount = matchingRaces.count
         
         switch position {
         case 1:
-            rankAlertTitle = "🏆 PB更新！"
-            rankAlertMessage = "\(name) のパーソナルベストを更新しました！"
+            rankAlertTitle = String(localized: "rank.alert.pb.title")
+            rankAlertMessage = String(format: String(localized: "rank.alert.pb.message %@"), name)
         case 2:
-            rankAlertTitle = "🥈 歴代2位！"
-            rankAlertMessage = "\(name) の歴代\(totalCount)件中 2位の好記録です！\nPBまであと少し！"
+            rankAlertTitle = String(localized: "rank.alert.2nd.title")
+            rankAlertMessage = String(format: String(localized: "rank.alert.2nd.message %@ %lld"), name, totalCount)
         case 3:
-            rankAlertTitle = "🥉 歴代3位！"
-            rankAlertMessage = "\(name) の歴代\(totalCount)件中 3位の好記録です！"
+            rankAlertTitle = String(localized: "rank.alert.3rd.title")
+            rankAlertMessage = String(format: String(localized: "rank.alert.3rd.message %@ %lld"), name, totalCount)
         case 4, 5:
-            rankAlertTitle = "✨ 好記録！"
-            rankAlertMessage = "\(name) の歴代\(totalCount)件中 \(position)位の記録です！"
+            rankAlertTitle = String(localized: "rank.alert.top5.title")
+            rankAlertMessage = String(format: String(localized: "rank.alert.top5.message %@ %lld %lld"), name, totalCount, position)
         default:
             return // 6位以下はアラートなし
         }
         
         showRankAlert = true
-    }
-
-    private func normalizeTime() {
-        let n = TimeInputNormalizer.normalize(hoursText: hoursText, minutesText: minutesText, secondsText: secondsText)
-        hoursText = n.hours; minutesText = n.minutes; secondsText = n.seconds
     }
 
     private func resetDistanceSelection() {

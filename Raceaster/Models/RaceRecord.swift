@@ -6,20 +6,55 @@ enum RaceType: String, Codable, CaseIterable {
     case road = "road"       // ロード
     case track = "track"     // トラック
     case other = "other"     // その他
-    
+    case field = "field"     // フィールド種目（跳躍・投擲）
+
     var displayName: String {
         switch self {
-        case .road: return "ロード"
-        case .track: return "トラック"
-        case .other: return "その他"
+        case .road: return String(localized: "race.type.road.display")
+        case .track: return String(localized: "race.type.track.display")
+        case .other: return String(localized: "race.type.other.display")
+        case .field: return String(localized: "race.type.field.display")
         }
     }
-    
+
     var iconName: String {
         switch self {
         case .road: return "road.lanes"
         case .track: return "figure.run.circle"
         case .other: return "flag.checkered"
+        case .field: return "figure.gymnastics"
+        }
+    }
+
+    /// タイム（秒）を記録する種目か。false はフィールド種目（距離・高さで記録）
+    var usesTime: Bool {
+        switch self {
+        case .track, .road, .other: return true
+        case .field: return false
+        }
+    }
+
+    /// VDOT 計算対象にできる種目か
+    var supportsVDOT: Bool {
+        switch self {
+        case .track, .road, .other: return true
+        case .field: return false
+        }
+    }
+
+    /// 保存時にタイムを整数秒に切り上げる種目か
+    var shouldCeilTime: Bool {
+        switch self {
+        case .road: return true
+        case .track, .other, .field: return false
+        }
+    }
+
+    /// 記録が小さいほど優秀か（false = 大きいほど優秀 = フィールド種目）
+    var smallerIsBetter: Bool {
+        switch self {
+        case .track, .road, .other: return true
+        case .field: return false
         }
     }
 }
@@ -32,9 +67,9 @@ enum TrackMeetType: String, Codable {
     
     var displayName: String {
         switch self {
-        case .timeTrial: return "記録会"
-        case .preliminary: return "予選"
-        case .final: return "決勝"
+        case .timeTrial: return String(localized: "race.meet.timetrial.display")
+        case .preliminary: return String(localized: "race.meet.preliminary.display")
+        case .final: return String(localized: "race.meet.final.display")
         }
     }
 }
@@ -89,7 +124,24 @@ final class RaceRecord {
     
     /// VDOT計測に含めるか
     var includeInVDOT: Bool = true
-    
+
+    // MARK: - フィールド種目専用フィールド（すべてOptional、既存データに影響なし）
+
+    /// 記録（m）：水平跳躍（走幅跳・三段跳）および投擲種目
+    var fieldDistance: Double? = nil
+
+    /// 記録（m）：垂直跳躍（走高跳・棒高跳）
+    var fieldHeight: Double? = nil
+
+    /// 試技結果（JSON文字列で保存）
+    var attemptResults: String? = nil
+
+    /// 風速（m/s）：跳躍種目の参考記録判定用
+    var windSpeed: Double? = nil
+
+    /// 追い風参考記録フラグ（追い風2.0m/s超の場合 true）
+    var isWindAided: Bool? = nil
+
     /// ラップタイムのリスト（子エンティティ）
     /// CloudKit ではリレーションは必ず Optional にする必要があるため Optional を採用
     @Relationship(deleteRule: .cascade, inverse: \Lap.raceRecord)
@@ -128,18 +180,14 @@ final class RaceRecord {
         self.raceType = raceType
         self.totalDistance = totalDistance
         // ロード種目は保存時に小数点以下を切り上げる（公式記録に合わせる）
-        if raceType == .road {
-            self.totalTime = ceil(totalTime)
-        } else {
-            self.totalTime = totalTime
-        }
+        self.totalTime = raceType.shouldCeilTime ? ceil(totalTime) : totalTime
         self.memo = memo
         self.trackMeetType = trackMeetType
         self.ranking = ranking
         self.laps = laps
         // 公式タイムも同様に扱う
         if let off = officialTime {
-            self.officialTime = (raceType == .road) ? ceil(off) : off
+            self.officialTime = raceType.shouldCeilTime ? ceil(off) : off
         } else {
             self.officialTime = nil
         }
@@ -151,23 +199,18 @@ final class RaceRecord {
 
     /// 外部から totalTime をセットする際に種目に応じた正規化を行う
     func setTotalTimeFromInput(_ seconds: Double) {
-        if raceType == .road {
-            self.totalTime = ceil(seconds)
-        } else {
-            self.totalTime = seconds
-        }
+        self.totalTime = raceType.shouldCeilTime ? ceil(seconds) : seconds
     }
 
     func setOfficialTimeFromInput(_ seconds: Double?) {
         guard let s = seconds else { self.officialTime = nil; return }
-        self.officialTime = (raceType == .road) ? ceil(s) : s
+        self.officialTime = raceType.shouldCeilTime ? ceil(s) : s
     }
 
     private func normalizeTimes() {
-        if raceType == .road {
-            if totalTime != ceil(totalTime) { totalTime = ceil(totalTime) }
-            if let off = officialTime, off != ceil(off) { officialTime = ceil(off) }
-        }
+        guard raceType.shouldCeilTime else { return }
+        if totalTime != ceil(totalTime) { totalTime = ceil(totalTime) }
+        if let off = officialTime, off != ceil(off) { officialTime = ceil(off) }
     }
 
     // raceType が変更された場合に時間の正規化を行う（外部から raceTypeRaw を直接変更するケースに備える）
