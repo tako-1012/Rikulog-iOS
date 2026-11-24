@@ -29,7 +29,16 @@ enum ScreenshotMode {
     }
 
     /// 詳細画面・祝福画面・シェア画面で使う記録の大会名
-    static let featuredRaceName = "Autumn Classic"
+    static var featuredRaceName: String { name("Autumn Classic", "秋季記録会") }
+
+    /// 撮影言語に応じてデモデータの名前を切り替える
+    private static var isJapanese: Bool {
+        Locale.preferredLanguages.first?.hasPrefix("ja") ?? false
+    }
+
+    private static func name(_ en: String, _ ja: String) -> String {
+        isJapanese ? ja : en
+    }
 
     // MARK: - デモデータ
 
@@ -48,8 +57,8 @@ enum ScreenshotMode {
             context.insert(p)
             return p
         }()
-        profile.name = "Jordan Lee"
-        profile.club = "Riverside Track Club"
+        profile.name = name("Jordan Lee", "佐藤 陸")
+        profile.club = name("Riverside Track Club", "さくら陸上クラブ")
 
         func date(_ y: Int, _ m: Int, _ d: Int) -> Date {
             Calendar.current.date(from: DateComponents(year: y, month: m, day: d)) ?? Date()
@@ -72,19 +81,19 @@ enum ScreenshotMode {
         laps.append(Lap(lapNumber: 13, distance: 0.2, time: total5000 - lapTimes.reduce(0, +)))
         _ = race(featuredRaceName, date(2026, 9, 20), .track, 5.0, total5000, meet: .final, rank: 2, laps: laps)
 
-        _ = race("Summer Twilight Meet", date(2026, 6, 7), .track, 5.0, 15 * 60 + 31.65, meet: .final, rank: 4)
-        _ = race("Spring Distance Carnival", date(2026, 4, 12), .track, 5.0, 15 * 60 + 48.20, meet: .timeTrial)
-        _ = race("Riverside Invitational", date(2026, 5, 17), .track, 1.5, 4 * 60 + 1.83, meet: .final, rank: 3)
-        _ = race("Midsummer Night Meet", date(2026, 7, 5), .track, 0.8, 2 * 60 + 3.10, meet: .preliminary, rank: 1)
-        _ = race("City Championships", date(2026, 10, 18), .track, 10.0, 32 * 60 + 10.45, meet: .final, rank: 5)
-        _ = race("Harbor 10K", date(2026, 3, 8), .road, 10.0, 32 * 60 + 45, rank: 12)
-        _ = race("Valley Half Marathon", date(2026, 2, 15), .road, 21.0975, 3600 + 11 * 60 + 52, rank: 9)
-        _ = race("Coastal Marathon", date(2025, 12, 7), .road, 42.195, 2 * 3600 + 34 * 60 + 18, rank: 21)
+        _ = race(name("Summer Twilight Meet", "夏季ナイター記録会"), date(2026, 6, 7), .track, 5.0, 15 * 60 + 31.65, meet: .final, rank: 4)
+        _ = race(name("Spring Distance Carnival", "春季長距離記録会"), date(2026, 4, 12), .track, 5.0, 15 * 60 + 48.20, meet: .timeTrial)
+        _ = race(name("Riverside Invitational", "招待陸上競技大会"), date(2026, 5, 17), .track, 1.5, 4 * 60 + 1.83, meet: .final, rank: 3)
+        _ = race(name("Midsummer Night Meet", "真夏のナイター陸上"), date(2026, 7, 5), .track, 0.8, 2 * 60 + 3.10, meet: .preliminary, rank: 1)
+        _ = race(name("City Championships", "市民陸上選手権"), date(2026, 10, 18), .track, 10.0, 32 * 60 + 10.45, meet: .final, rank: 5)
+        _ = race(name("Harbor 10K", "港町10kmロードレース"), date(2026, 3, 8), .road, 10.0, 32 * 60 + 45, rank: 12)
+        _ = race(name("Valley Half Marathon", "川沿いハーフマラソン"), date(2026, 2, 15), .road, 21.0975, 3600 + 11 * 60 + 52, rank: 9)
+        _ = race(name("Coastal Marathon", "海岸線マラソン"), date(2025, 12, 7), .road, 42.195, 2 * 3600 + 34 * 60 + 18, rank: 21)
 
         // フィールド種目（走幅跳）
-        for (name, d, mark) in [("Spring Jumps Festival", date(2026, 5, 30), 6.62),
-                                ("Regional Open", date(2026, 8, 23), 6.85)] {
-            let r = RaceRecord(raceName: name, date: d, raceType: .field, totalDistance: 201.0,
+        for (title, d, mark) in [(name("Spring Jumps Festival", "春季跳躍競技会"), date(2026, 5, 30), 6.62),
+                                (name("Regional Open", "地区オープン大会"), date(2026, 8, 23), 6.85)] {
+            let r = RaceRecord(raceName: title, date: d, raceType: .field, totalDistance: 201.0,
                                totalTime: 1.0, includeInVDOT: false)
             r.fieldDistance = mark
             r.windSpeed = 1.2
