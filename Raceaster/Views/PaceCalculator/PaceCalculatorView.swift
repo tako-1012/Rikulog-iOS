@@ -10,34 +10,48 @@ struct PaceCalculatorView: View {
     @FocusState private var focusedTimeField: TimeInputFields.FocusedField?
     @FocusState private var focusedPaceField: TimeInputFields.FocusedField?
 
+    /// 画面上部で切り替えるツール
+    private enum CalculatorTool: Hashable {
+        case pace
+        case treadmill
+    }
+    @State private var tool: CalculatorTool = .pace
+
     public init() {}
 
     var body: some View {
         NavigationStack {
             Form {
-                // 結果を上部に表示（カード形式）
-                resultSection
-                
-                modeSection
-                
-                // 入力モードに応じたセクション表示
-                Group {
-                    switch viewModel.mode {
-                    case .calculatePace:
-                        distanceSection
-                        timeSection
-                    case .calculateTime:
-                        distanceSection
-                        paceSection
-                    case .calculateDistance:
-                        timeSection
-                        paceSection
+                toolPickerSection
+
+                switch tool {
+                case .pace:
+                    // 結果を上部に表示（カード形式）
+                    resultSection
+
+                    modeSection
+
+                    // 入力モードに応じたセクション表示
+                    Group {
+                        switch viewModel.mode {
+                        case .calculatePace:
+                            distanceSection
+                            timeSection
+                        case .calculateTime:
+                            distanceSection
+                            paceSection
+                        case .calculateDistance:
+                            timeSection
+                            paceSection
+                        }
                     }
+
+                    calculateButtonSection
+                    lapPresetSection
+                case .treadmill:
+                    treadmillSpeedToPaceSection
+                    treadmillPaceToSpeedSection
                 }
-                
-                calculateButtonSection
-                lapPresetSection
-                treadmillSection
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("calculator.title")
@@ -243,62 +257,72 @@ struct PaceCalculatorView: View {
         }
     }
     
-    private var treadmillSection: some View {
-        Section("treadmill.section.title") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("treadmill.speed.label")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    AccessoryTextField(text: $viewModel.treadmillSpeedText, placeholder: "10.0", keyboardType: .decimalPad, isFirstResponder: nil, showAccessory: true)
-                    Text("km/h")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if let pace = viewModel.treadmillPaceResult {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(pace)
-                                .font(.headline)
-                                .foregroundStyle(.blue)
-                                .monospacedDigit()
-                            Text("/km")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
+    // MARK: - ツール切り替え
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("treadmill.pace.label")
+    private var toolPickerSection: some View {
+        Section {
+            Picker("", selection: $tool) {
+                Text("calculator.title").tag(CalculatorTool.pace)
+                Text("treadmill.section.title").tag(CalculatorTool.treadmill)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+    }
+
+    // MARK: - トレッドミル換算
+
+    private var treadmillSpeedToPaceSection: some View {
+        Section("treadmill.speed.label") {
+            HStack(spacing: 8) {
+                AccessoryTextField(text: $viewModel.treadmillSpeedText, placeholder: "10.0", keyboardType: .decimalPad, isFirstResponder: nil, showAccessory: true)
+                    .frame(width: 88)
+                Text("km/h")
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                Spacer(minLength: 8)
+                treadmillResult(value: viewModel.treadmillPaceResult, unit: "/km")
+            }
+        }
+    }
+
+    private var treadmillPaceToSpeedSection: some View {
+        Section("treadmill.pace.label") {
+            HStack(spacing: 6) {
+                AccessoryTextField(text: $viewModel.treadmillPaceMinutesText, placeholder: "5", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: true)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 52)
+                Text(":")
+                    .foregroundStyle(.secondary)
+                AccessoryTextField(text: $viewModel.treadmillPaceSecondsText, placeholder: "30", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: true)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 52)
+                Text("/km")
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                Spacer(minLength: 8)
+                treadmillResult(value: viewModel.treadmillSpeedResult, unit: "km/h")
+            }
+        }
+    }
+
+    /// 換算結果（"→ 17.1 km/h" など）を1行で表示する
+    @ViewBuilder
+    private func treadmillResult(value: String?, unit: String) -> some View {
+        if let value {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.right")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 4) {
-                    AccessoryTextField(text: $viewModel.treadmillPaceMinutesText, placeholder: "5", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: true)
-                        .multilineTextAlignment(.center)
-                    Text(":")
-                        .foregroundStyle(.secondary)
-                    AccessoryTextField(text: $viewModel.treadmillPaceSecondsText, placeholder: "30", keyboardType: .numberPad, isFirstResponder: nil, showAccessory: true)
-                        .multilineTextAlignment(.center)
-                    Text("/km")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if let speed = viewModel.treadmillSpeedResult {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(speed)
-                                .font(.headline)
-                                .foregroundStyle(.blue)
-                                .monospacedDigit()
-                            Text("km/h")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                Text(value)
+                    .font(.title3.bold())
+                    .foregroundStyle(.blue)
+                    .monospacedDigit()
+                Text(unit)
+                    .foregroundStyle(.secondary)
             }
+            .lineLimit(1)
+            .fixedSize()
         }
     }
 

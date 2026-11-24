@@ -37,6 +37,9 @@ struct MainTabView: View {
                     .background(Color(UIColor.systemBackground))
             }
         }
+        // キーボード表示時にタブバーと広告バナーが持ち上がらないようにする
+        // （各タブ内のフォームは自身でキーボードを避ける）
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }
 
