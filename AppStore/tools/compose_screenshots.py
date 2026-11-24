@@ -4,110 +4,136 @@ usage: python3 -I compose_screenshots.py <work_dir> [en|ja]
   <work_dir>/shots/<screen>.png を読み、<work_dir>/store/<screen>.png に書き出す
 """
 import sys
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 S = sys.argv[1]
 LANG = sys.argv[2] if len(sys.argv) > 2 else "en"
 W, H = 1320, 2868
-FONT = "/System/Library/Fonts/SFNS.ttf"
-JA_FONT_BOLD = "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc"
-JA_FONT_REGULAR = "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc"
 
-SLIDES_JA = [
-    ("pb", "自己ベストをお祝い", "記録を入れるだけで\n自己ベスト更新を自動でお知らせ"),
-    ("records", "全レース、全ラップを記録", "トラック・ロード・跳躍・投擲を\nひとつのアプリで"),
-    ("profile", "走力をVDOTで見える化", "実際のレース結果から\n走力と練習ペースを算出"),
-    ("calculator", "目標ペースを一瞬で", "距離・タイム・ペースを相互計算\nラップごとの通過タイムも"),
-    ("share", "記録をカードでシェア", "SNS映えする記録カードを\nワンタップで作成"),
-    ("treadmill", "トレッドミル換算", "km/h と /km を\nワンタップで切り替え"),
-]
+SF = "/System/Library/Fonts/SFNS.ttf"
+JA_BOLD = "/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc"
+JA_REGULAR = "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc"
 
-SLIDES = [
-    ("pb", "Celebrate every PR", "Instant personal best tracking\nfor every event"),
-    ("records", "Every race. Every split.", "Track, road, jumps and throws\nin one clean log"),
-    ("profile", "Know your VDOT", "Fitness score and training paces\nfrom your real races"),
-    ("calculator", "Pace it perfectly", "Solve for distance, time or pace\nwith lap-by-lap splits"),
-    ("share", "Share your result", "Beautiful race cards\nfor social media"),
-    ("treadmill", "Treadmill converter", "Switch between km/h and min/km\nin one tap"),
-]
+BG = (14, 16, 21)
+LANE = (30, 34, 43)
+INDEX = (24, 28, 36)
+WHITE = (245, 246, 248)
+MUTED = (150, 158, 172)
+ACCENT = (61, 133, 255)
+MARGIN = 96
 
-TOP = (37, 110, 255)
-BOTTOM = (10, 52, 170)
+# (画面, ラベル, 見出し, 強調する語, 説明)
+SLIDES = {
+    "en": [
+        ("pb", "PERSONAL BEST", "CELEBRATE\nEVERY PR", "PR", "Instant PB tracking for every event"),
+        ("records", "RACE LOG", "EVERY RACE.\nEVERY SPLIT.", "SPLIT.", "Track, road, jumps and throws in one log"),
+        ("profile", "VDOT", "KNOW YOUR\nVDOT", "VDOT", "Fitness score and training paces from real races"),
+        ("calculator", "PACE CALCULATOR", "PACE IT\nPERFECTLY", "PERFECTLY", "Distance, time or pace - with lap splits"),
+        ("share", "SHARE", "SHARE THE\nMOMENT", "MOMENT", "Race cards made for social media"),
+        ("treadmill", "TREADMILL", "TREADMILL\nTO TRACK", "TO TRACK", "Convert km/h and min/km in one tap"),
+    ],
+    "ja": [
+        ("pb", "PERSONAL BEST", "自己ベストを、\n祝おう。", "祝おう。", "記録を入れるだけで、更新を自動でお知らせ"),
+        ("records", "RACE LOG", "全レース、\n全ラップ。", "全ラップ。", "トラック・ロード・跳躍・投擲をひとつに"),
+        ("profile", "VDOT", "走力を、\nVDOTで。", "VDOTで。", "レース結果から走力と練習ペースを算出"),
+        ("calculator", "PACE CALCULATOR", "目標ペースを、\n一瞬で。", "一瞬で。", "距離・タイム・ペースを相互計算"),
+        ("share", "SHARE", "その記録、\nシェアしよう。", "シェアしよう。", "SNS映えする記録カードをワンタップで"),
+        ("treadmill", "TREADMILL", "トレッドミルも、\nワンタップ。", "ワンタップ。", "km/h と /km をすぐに換算"),
+    ],
+}
 
 
-def font(size, weight):
-    if LANG == "ja":
-        path = JA_FONT_BOLD if weight == "Bold" else JA_FONT_REGULAR
-        return ImageFont.truetype(path, size)
-    f = ImageFont.truetype(FONT, size)
-    try:
-        f.set_variation_by_name(weight)
-    except Exception:
-        pass
+def sf(size, style):
+    f = ImageFont.truetype(SF, size)
+    f.set_variation_by_name(style)
     return f
 
 
-def gradient():
-    bg = Image.new("RGB", (W, H))
-    px = bg.load()
-    for y in range(H):
-        t = y / (H - 1)
-        c = tuple(int(TOP[i] + (BOTTOM[i] - TOP[i]) * t) for i in range(3))
-        for x in range(W):
-            px[x, y] = c
-    return bg
+def headline_font(size):
+    if LANG == "ja":
+        return ImageFont.truetype(JA_BOLD, size)
+    return sf(size, "Compressed Black")
 
 
-def rounded(im, radius):
-    mask = Image.new("L", im.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, *im.size), radius=radius, fill=255)
-    out = im.convert("RGBA")
-    out.putalpha(mask)
-    return out
+def body_font(size):
+    if LANG == "ja":
+        return ImageFont.truetype(JA_REGULAR, size)
+    return sf(size, "Medium")
 
 
-def centered(draw, y, text, f, fill, spacing):
+def background(index):
+    im = Image.new("RGB", (W, H), BG)
+    d = ImageDraw.Draw(im)
+    # 大きな通し番号（背景の飾り）
+    num = f"{index:02d}"
+    nf = sf(900, "Compressed Black")
+    nw = d.textlength(num, font=nf)
+    d.text((W - nw + 40, 980), num, font=nf, fill=INDEX)
+    # トラックのレーンを思わせる斜線
+    for i in range(4):
+        off = i * 150
+        d.line([(-200, 2250 + off), (W + 200, 1450 + off)], fill=LANE, width=5)
+    return im
+
+
+def rounded_mask(size, radius):
+    mask = Image.new("L", size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, *size), radius=radius, fill=255)
+    return mask
+
+
+def draw_headline(d, text, accent, y):
+    size = 230 if LANG == "en" else 132
     lines = text.split("\n")
+    f = headline_font(size)
+    while max(d.textlength(l, font=f) for l in lines) > W - MARGIN * 2 and size > 60:
+        size -= 6
+        f = headline_font(size)
+    leading = int(size * (0.92 if LANG == "en" else 1.18))
     for line in lines:
-        w = draw.textlength(line, font=f)
-        draw.text(((W - w) / 2, y), line, font=f, fill=fill)
-        y += f.size + spacing
+        x = MARGIN
+        if accent and accent in line:
+            head, tail = line.split(accent, 1)
+            for part, color in ((head, WHITE), (accent, ACCENT), (tail, WHITE)):
+                if part:
+                    d.text((x, y), part, font=f, fill=color)
+                    x += d.textlength(part, font=f)
+        else:
+            d.text((x, y), line, font=f, fill=WHITE)
+        y += leading
     return y
 
 
-base = gradient()
-title_font = font(108 if LANG == "ja" else 118, "Bold")
-sub_font = font(54 if LANG == "ja" else 58, "Medium")
+def compose(index, screen, label, title, accent, sub):
+    canvas = background(index)
+    d = ImageDraw.Draw(canvas)
 
-for name, title, subtitle in (SLIDES_JA if LANG == "ja" else SLIDES):
-    canvas = base.copy().convert("RGBA")
-    draw = ImageDraw.Draw(canvas)
+    # ラベル（例: 01 — PERSONAL BEST）
+    lf = sf(40, "Semibold")
+    d.text((MARGIN, 170), f"{index:02d}  —  {label}", font=lf, fill=ACCENT)
 
-    # 長い見出しは左右に余白が残るよう文字を縮める
-    tf = title_font
-    while draw.textlength(title, font=tf) > W - 160 and tf.size > 70:
-        tf = font(tf.size - 4, "Bold")
-    y = centered(draw, 200, title, tf, (255, 255, 255), 20)
-    centered(draw, y + 30, subtitle, sub_font, (220, 232, 255), 18)
+    y = draw_headline(d, title, accent, 250)
+    d.text((MARGIN, y + 36), sub, font=body_font(50 if LANG == "en" else 44), fill=MUTED)
 
-    shot = Image.open(f"{S}/shots/{name}.png").convert("RGB")
-    sw = 1010
+    # 端末（下端は画面外にはみ出させる）
+    shot = Image.open(f"{S}/shots/{screen}.png").convert("RGB")
+    sw = 1000
     sh = int(shot.height * sw / shot.width)
-    shot = rounded(shot.resize((sw, sh), Image.LANCZOS), 96)
+    shot = shot.resize((sw, sh), Image.LANCZOS)
+    bezel = 16
+    sx = (W - sw) // 2
+    sy = max(y + 200, 900)
 
-    sx, sy = (W - sw) // 2, 640
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).rounded_rectangle(
-        (sx, sy + 24, sx + sw, sy + sh + 24), radius=96, fill=(0, 0, 0, 110)
-    )
-    canvas = Image.alpha_composite(canvas, shadow.filter(ImageFilter.GaussianBlur(40)))
-    # 端末の縁取り
-    frame = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    ImageDraw.Draw(frame).rounded_rectangle(
-        (sx - 14, sy - 14, sx + sw + 14, sy + sh + 14), radius=110, fill=(18, 18, 22, 255)
-    )
-    canvas = Image.alpha_composite(canvas, frame)
-    canvas.alpha_composite(shot, (sx, sy))
+    frame = Image.new("RGBA", (sw + bezel * 2, sh + bezel * 2), (0, 0, 0, 0))
+    fd = ImageDraw.Draw(frame)
+    fd.rounded_rectangle((0, 0, sw + bezel * 2 - 1, sh + bezel * 2 - 1), radius=128, fill=(4, 5, 8, 255),
+                         outline=(58, 63, 74, 255), width=3)
+    frame.paste(shot, (bezel, bezel), rounded_mask((sw, sh), 112))
+    canvas.paste(frame, (sx - bezel, sy - bezel), frame)
 
-    canvas.convert("RGB").save(f"{S}/store/{name}.png")
-    print("saved", name)
+    canvas.save(f"{S}/store/{screen}.png")
+    print("saved", screen)
+
+
+for i, slide in enumerate(SLIDES[LANG], 1):
+    compose(i, *slide)

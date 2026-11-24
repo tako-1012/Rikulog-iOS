@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>RikuLog</string>
+	<string>Bell Lap</string>
 	<key>CFBundleExecutable</key>
 	<string>Raceaster</string>
 	<key>CFBundleIdentifier</key>
