@@ -10,6 +10,8 @@ struct SingleRaceShareCard: View {
     let showPersonalRank: Bool
     let showMemo: Bool
     let personalRankTitle: String? // e.g., "PB", "SB"
+    /// 登録済み種目の表示名（例: "5000m"）。nil の場合は距離から "5km" の形式で表示する
+    var eventName: String? = nil
     
     var body: some View {
         VStack(spacing: 0) {
@@ -50,7 +52,7 @@ struct SingleRaceShareCard: View {
                 VStack(spacing: 12) { // 20 -> 12 に縮小
                     // 距離・種目バッジ
                     HStack(spacing: 8) {
-                        Text(race.raceType == .field ? race.raceType.displayName : formatDistance(race.totalDistance))
+                        Text(race.raceType == .field ? race.raceType.displayName : (eventName ?? formatDistance(race.totalDistance)))
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 4)

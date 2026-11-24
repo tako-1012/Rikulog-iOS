@@ -9,6 +9,7 @@ struct ShareRaceView: View {
     let userProfile: UserProfile
     
     @Query private var allRaces: [RaceRecord]
+    @Query private var distances: [RaceDistance]
     
     // UI State
     @State private var showRaceName: Bool = true
@@ -162,8 +163,17 @@ struct ShareRaceView: View {
             showRank: showRank,
             showPersonalRank: showPersonalRank,
             showMemo: showMemo,
-            personalRankTitle: personalRankTitle
+            personalRankTitle: personalRankTitle,
+            eventName: registeredEventName
         )
+    }
+
+    /// 記録に対応する登録済み種目の表示名（走種目のみ）
+    private var registeredEventName: String? {
+        guard race.raceType != .field else { return nil }
+        return distances.first {
+            $0.raceType == race.raceType && $0.matches(distance: race.totalDistance)
+        }?.localizedName
     }
     
     @MainActor
