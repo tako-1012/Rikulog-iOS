@@ -22,13 +22,21 @@ struct RaceMasterApp: App {
         //     UIApplication.shared.enableKeyboardDismissOnTap()
         // }
 
-        // ATT（追跡許可）を1秒後に要求
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            RaceMasterApp.requestTrackingAuthorization()
-        }
+        #if DEBUG
+        let isScreenshotMode = ScreenshotMode.isEnabled
+        #else
+        let isScreenshotMode = false
+        #endif
 
-        // 月末リマインダーのローカル通知を準備
-        NotificationManager.shared.ensureMonthEndReminderScheduled()
+        if !isScreenshotMode {
+            // ATT（追跡許可）を1秒後に要求
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                RaceMasterApp.requestTrackingAuthorization()
+            }
+
+            // 月末リマインダーのローカル通知を準備
+            NotificationManager.shared.ensureMonthEndReminderScheduled()
+        }
 
         // 起動時のエントitlements と 購入状態をログ出力（実機デバッグ用）
         DispatchQueue.main.async {
@@ -43,7 +51,12 @@ struct RaceMasterApp: App {
 
         // DB初期化・マイグレーション（init()完了後に非同期実行してメインスレッドをブロックしない）
         let container = sharedModelContainer
-        Task { AppInitializer.run(in: container) }
+        Task {
+            AppInitializer.run(in: container)
+            #if DEBUG
+            ScreenshotMode.seedDemoData(in: container)
+            #endif
+        }
     }
 
     // ATT リクエスト関数

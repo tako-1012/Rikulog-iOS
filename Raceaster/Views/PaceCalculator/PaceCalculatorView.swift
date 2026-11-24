@@ -67,6 +67,9 @@ struct PaceCalculatorView: View {
             }
             .onAppear {
                 viewModel.distances = distances
+                #if DEBUG
+                applyScreenshotPreset()
+                #endif
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -234,6 +237,8 @@ struct PaceCalculatorView: View {
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.leading)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                         
                         Spacer()
                         
@@ -442,3 +447,31 @@ struct PaceCalculatorView: View {
     PaceCalculatorView()
         .modelContainer(for: [RaceDistance.self], inMemory: true)
 }
+#if DEBUG
+extension PaceCalculatorView {
+    /// スクリーンショット撮影モード用の入力済み状態（DEBUG専用）
+    fileprivate func applyScreenshotPreset() {
+        guard ScreenshotMode.isEnabled else { return }
+        switch ScreenshotMode.screen {
+        case "calculator":
+            tool = .pace
+            viewModel.mode = .calculatePace
+            if let d = distances.first(where: { $0.raceType == .track && abs($0.distanceKm - 5.0) < 0.001 }) {
+                viewModel.selectedDistanceId = d.persistentModelID
+                viewModel.applyDistanceSelection(d)
+            }
+            viewModel.hoursText = "0"
+            viewModel.minutesText = "15"
+            viewModel.secondsText = "0"
+            viewModel.calculate()
+        case "treadmill":
+            tool = .treadmill
+            viewModel.treadmillSpeedText = "16.0"
+            viewModel.treadmillPaceMinutesText = "3"
+            viewModel.treadmillPaceSecondsText = "30"
+        default:
+            break
+        }
+    }
+}
+#endif

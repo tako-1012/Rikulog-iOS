@@ -127,6 +127,9 @@ struct RaceLogListView: View {
             } message: { race in
                 Text(String(format: String(localized: "racelog.delete.message %@"), race.raceName))
             }
+            #if DEBUG
+            .modifier(ScreenshotRaceLogHooks(races: races))
+            #endif
         }
     }
 
@@ -385,3 +388,53 @@ struct RaceRowView: View {
         .modelContainer(for: [RaceRecord.self, Lap.self, RaceDistance.self], inMemory: true)
         .environmentObject(AppEntitlements.shared)
 }
+
+#if DEBUG
+/// スクリーンショット撮影モードで詳細・祝福・シェア画面を自動表示する（DEBUG専用）
+private struct ScreenshotRaceLogHooks: ViewModifier {
+    let races: [RaceRecord]
+    @Query private var userProfiles: [UserProfile]
+    @State private var detailRace: RaceRecord?
+    @State private var celebration: PBCelebration?
+    @State private var shareRace: RaceRecord?
+    @State private var didPresent = false
+
+    func body(content: Content) -> some View {
+        content
+            .navigationDestination(item: $detailRace) { RaceDetailView(race: $0) }
+            .sheet(item: $celebration) {
+                PBCelebrationView(celebration: $0, userProfile: userProfiles.first)
+            }
+            .sheet(item: $shareRace) { race in
+                if let profile = userProfiles.first {
+                    ShareRaceView(race: race, userProfile: profile)
+                }
+            }
+            .task(id: races.count) {
+                guard ScreenshotMode.isEnabled, !didPresent,
+                      let featured = races.first(where: { $0.raceName == ScreenshotMode.featuredRaceName })
+                else { return }
+                try? await Task.sleep(for: .seconds(1))
+                didPresent = true
+                switch ScreenshotMode.screen {
+                case "detail":
+                    detailRace = featured
+                case "pb":
+                    let previousBest = races
+                        .filter { $0.raceType == .track && abs($0.totalDistance - 5.0) < 0.001 && $0.id != featured.id }
+                        .map(\.totalTime).min() ?? featured.totalTime
+                    celebration = PBCelebration(
+                        race: featured,
+                        eventName: "5000m",
+                        recordText: TimeFormatter.formatTime(featured.totalTime, for: .track),
+                        improvementText: PBImprovementFormatter.time(previousBest - featured.totalTime, raceType: .track)
+                    )
+                case "share":
+                    shareRace = featured
+                default:
+                    break
+                }
+            }
+    }
+}
+#endif

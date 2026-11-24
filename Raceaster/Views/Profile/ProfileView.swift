@@ -260,7 +260,13 @@ struct PersonalBestRow: View {
 struct VDOTAverageSection: View {
     let races: [RaceRecord]; let userProfile: UserProfile
     @State private var selectedPeriod: Int = 90
-    @State private var showTrainingPaces: Bool = false
+    @State private var showTrainingPaces: Bool = {
+        #if DEBUG
+        return ScreenshotMode.isEnabled
+        #else
+        return false
+        #endif
+    }()
     var body: some View {
         Section("profile.performance.section") {
             Picker("期間", selection: $selectedPeriod) { Text("profile.period.3months").tag(90); Text("profile.period.6months").tag(180); Text("profile.period.all").tag(9999) }.pickerStyle(.segmented)

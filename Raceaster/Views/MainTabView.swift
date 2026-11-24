@@ -4,29 +4,40 @@ import SwiftData
 /// アプリのメインタブビュー
 struct MainTabView: View {
     @EnvironmentObject var entitlements: AppEntitlements
+    @State private var selectedTab: Int = {
+        #if DEBUG
+        return ScreenshotMode.initialTab
+        #else
+        return 0
+        #endif
+    }()
 
     var body: some View {
         VStack(spacing: 0) {
-            TabView {
+            TabView(selection: $selectedTab) {
                 RaceLogListView()
                     .tabItem {
                         Label("tab.records", systemImage: "list.bullet.clipboard.fill")
                     }
+                    .tag(0)
 
                 PaceCalculatorView()
                     .tabItem {
                         Label("tab.calculator", systemImage: "stopwatch.fill")
                     }
+                    .tag(1)
 
                 ProfileView()
                     .tabItem {
                         Label("tab.profile", systemImage: "person.crop.circle.fill")
                     }
+                    .tag(2)
 
                 SettingsView()
                     .tabItem {
                         Label("tab.settings", systemImage: "gearshape.fill")
                     }
+                    .tag(3)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
